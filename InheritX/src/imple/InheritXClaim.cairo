@@ -12,14 +12,11 @@ pub mod InheritxClaim {
     struct Storage {
         // Contract admin/owner
         owner: ContractAddress,
-        
         // Claim management
         claims_count: u256,
-        
         // Beneficiary to claims mapping
         beneficiary_claims: Map<(ContractAddress, u256), u256>, // (beneficiary, index) -> claim_id
         beneficiary_claims_count: Map<ContractAddress, u256>,
-        
         // Claim details
         claim_beneficiary: Map<u256, ContractAddress>, // claim_id -> beneficiary
         claim_asset_owner: Map<u256, ContractAddress>, // claim_id -> asset_owner
@@ -29,19 +26,16 @@ pub mod InheritxClaim {
         claim_submission_date: Map<u256, u64>, // claim_id -> submission_date
         claim_transfer_date: Map<u256, u64>, // claim_id -> transfer_date
         claim_total_value: Map<u256, u256>, // claim_id -> total_value
-        
         // Token and NFT claims
         token_claims_count: Map<u256, u256>,
         token_claims: Map<(u256, u256), TokenClaim>, // (claim_id, token_index) -> token_claim
         nft_claims_count: Map<u256, u256>,
         nft_claims: Map<(u256, u256), NFTClaim>, // (claim_id, nft_index) -> nft_claim
-        
         // Plan reference
         plan_contract: ContractAddress,
-        
         // Claim codes
         valid_claim_codes: Map<felt252, bool>, // claim_code -> is_valid
-        plan_claim_codes: Map<u256, felt252>, // plan_id -> claim_code
+        plan_claim_codes: Map<u256, felt252> // plan_id -> claim_code
     }
 
 
@@ -112,7 +106,7 @@ pub mod InheritxClaim {
             // 6. Return the serialized data
             panic!("Not implemented")
         }
-        
+
         fn get_beneficiary_claims(
             self: @ContractState, beneficiary: ContractAddress,
         ) -> Array<felt252> {
@@ -125,7 +119,7 @@ pub mod InheritxClaim {
             // 6. Return array of serialized claims
             panic!("Not implemented")
         }
-        
+
         fn get_claim_status(self: @ContractState, claim_id: u256) -> felt252 {
             // TODO: Implement get_claim_status
             // 1. Verify claim_id exists
@@ -134,15 +128,17 @@ pub mod InheritxClaim {
             // 4. Return the status as felt252
             panic!("Not implemented")
         }
-        
+
         fn initiate_claim(
             ref self: ContractState, plan_id: u256, beneficiary: ContractAddress, claim_code: u256,
         ) -> felt252 {
             // TODO: Implement initiate_claim
             // 1. Verify the caller is the beneficiary (assert caller == beneficiary)
-            // 2. Verify the claim code provided by the user is valid (check valid_claim_codes mapping)
+            // 2. Verify the claim code provided by the user is valid (check valid_claim_codes
+            // mapping)
             // 3. Verify plan_id exists by checking with plan_contract
-            // 4. Verify the claim code matches the one associated with the plan (check plan_claim_codes mapping)
+            // 4. Verify the claim code matches the one associated with the plan (check
+            // plan_claim_codes mapping)
             // 5. Verify beneficiary is eligible for this plan (check with plan_contract)
             // 6. Generate a new claim_id (increment claims_count)
             // 7. Retrieve plan details from plan_contract:
