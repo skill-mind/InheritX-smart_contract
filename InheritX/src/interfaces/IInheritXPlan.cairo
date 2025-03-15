@@ -29,7 +29,7 @@ pub struct TokenInfo {
 }
 
 #[derive(Drop, Serde)]
-struct BeneficiaryInfo {
+pub struct BeneficiaryInfo {
     name: felt252,
     email: felt252,
     wallet_address: ContractAddress,
@@ -39,21 +39,21 @@ struct BeneficiaryInfo {
 }
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
-struct TokenAllocation {
+pub struct TokenAllocation {
     token: ContractAddress,
     percentage: u8,
     estimated_value: u256,
 }
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
-struct NFTAllocation {
+pub struct NFTAllocation {
     contract_address: ContractAddress,
     token_id: u256,
     collection_name: felt252,
 }
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
-struct PlanConditions {
+pub struct PlanConditions {
     transfer_date: u64,
     inactivity_period: u64,
     multi_signature_required: bool,
@@ -61,7 +61,7 @@ struct PlanConditions {
 }
 
 #[derive(Drop, Serde)]
-struct MediaMessage {
+pub struct MediaMessage {
     file_hash: felt252,
     file_name: felt252,
     file_type: felt252,
@@ -72,25 +72,29 @@ struct MediaMessage {
 
 #[derive(Copy, Drop, Serde)]
 pub enum PlanStatus {
-    Draft: (),
-    Active: (),
-    Executed: (),
-    Cancelled: (),
+    Draft,
+    Active,
+    Executed,
+    Cancelled,
 }
 
 #[derive(Copy, Drop, Serde)]
-enum PlanSection {
+pub enum PlanSection {
     BasicInformation: (),
     Beneficiaries: (),
     MediaAndRecipients: (),
 }
 
 #[starknet::interface]
-trait IInheritXPlan<TContractState> {
+pub trait IInheritXPlan<TContractState> {
     // Plan Overview Management
     fn get_plan_section(self: @TContractState, plan_id: u256, section: PlanSection) -> PlanOverview;
 
-    fn get_beneficiaries_details(self: @TContractState, plan_id: u256) -> Array<BeneficiaryInfo>;
+    fn get_beneficiaries_details(self: @TContractState, plan_id: u256) -> Array<SimpleBeneficiary>;
+
+    fn get_beneficiary_allocations(
+        self: @TContractState, plan_id: u256, beneficiary_id: u32,
+    ) -> BeneficiaryAllocation;
 
     fn get_media_messages(self: @TContractState, plan_id: u256) -> Array<MediaMessage>;
 
@@ -105,10 +109,12 @@ trait IInheritXPlan<TContractState> {
         name: felt252,
         description: felt252,
         selected_tokens: Array<TokenInfo>,
-    ) -> u256;
+        code: u256,
+        beneficiary: SimpleBeneficiary,
+    ) -> felt252;
 
     fn add_beneficiaries(
-        ref self: TContractState, plan_id: u256, beneficiaries: Array<BeneficiaryInfo>,
+        ref self: TContractState, plan_id: u256, beneficiaries: Array<SimpleBeneficiary>,
     );
 
     fn set_plan_conditions(ref self: TContractState, plan_id: u256, conditions: PlanConditions);
@@ -123,70 +129,54 @@ trait IInheritXPlan<TContractState> {
 
     // Media Preview
     fn get_media_preview_url(self: @TContractState, plan_id: u256, file_hash: felt252) -> felt252;
+
+    // Beneficiary Management
+    fn add_beneficiary(
+        ref self: TContractState,
+        plan_id: u256,
+        name: felt252,
+        email: felt252,
+        address: ContractAddress,
+    ) -> felt252;
+
+    fn get_beneficiary(
+        self: @TContractState, plan_id: u256, address: ContractAddress,
+    ) -> SimpleBeneficiary;
+
+    // Media Management
+    fn add_media_file(
+        ref self: TContractState,
+        plan_id: u256,
+        file_hash: felt252,
+        file_name: felt252,
+        file_type: felt252,
+        file_size: u64,
+        recipients: Array<ContractAddress>,
+    );
+
+    // Statistics and Totals
+    fn get_total_plans(self: @TContractState) -> u256;
+    fn get_total_assets(self: @TContractState) -> u256;
+    fn get_total_activity(self: @TContractState) -> u64;
+    fn get_plan_total_beneficiaries(self: @TContractState, plan_id: u256) -> u32;
+    
+}
+#[derive(Copy, Drop, Serde, starknet::Store)]
+pub struct SimpleBeneficiary {
+    pub id: u32, // Unique identifier for the beneficiary
+    pub name: felt252,
+    pub email: felt252,
+    pub wallet_address: ContractAddress,
+    pub personal_message: felt252,
 }
 
-// Events
-#[event]
-#[derive(Drop, starknet::Event)]
-enum PlanEvent {
-    PlanCreated: PlanCreated,
-    BeneficiariesAdded: BeneficiariesAdded,
-    ConditionsSet: ConditionsSet,
-    MediaAdded: MediaAdded,
-    PlanExecuted: PlanExecuted,
-    PlanOverridden: PlanOverridden,
-    PlanDeleted: PlanDeleted,
+// Separate structs for token and NFT allocations
+#[derive(Drop, Serde)]
+pub struct BeneficiaryAllocation {
+    pub beneficiary_id: u32,
+    pub token_allocations: Array<TokenAllocation>,
+    pub nft_allocations: Array<NFTAllocation>,
 }
 
-#[derive(Drop, starknet::Event)]
-struct PlanCreated {
-    plan_id: u256,
-    creator: ContractAddress,
-    name: felt252,
-    timestamp: u64,
-}
 
-#[derive(Drop, starknet::Event)]
-struct BeneficiariesAdded {
-    plan_id: u256,
-    beneficiary_count: u32,
-    total_allocation: u256,
-}
 
-#[derive(Drop, starknet::Event)]
-struct ConditionsSet {
-    plan_id: u256,
-    transfer_date: u64,
-    inactivity_period: u64,
-    multi_sig_enabled: bool,
-}
-
-#[derive(Drop, starknet::Event)]
-struct MediaAdded {
-    plan_id: u256,
-    file_count: u32,
-    total_size: u64,
-}
-
-#[derive(Drop, starknet::Event)]
-struct PlanExecuted {
-    plan_id: u256,
-    executor: ContractAddress,
-    timestamp: u64,
-    total_value_transferred: u256,
-}
-
-#[derive(Drop, starknet::Event)]
-struct PlanOverridden {
-    plan_id: u256,
-    overrider: ContractAddress,
-    timestamp: u64,
-    reason: felt252,
-}
-
-#[derive(Drop, starknet::Event)]
-struct PlanDeleted {
-    plan_id: u256,
-    deleter: ContractAddress,
-    timestamp: u64,
-}
