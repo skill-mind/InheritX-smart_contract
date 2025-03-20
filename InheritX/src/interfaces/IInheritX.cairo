@@ -19,6 +19,7 @@ pub struct AssetAllocation {
 
 #[starknet::interface]
 pub trait IInheritX<TContractState> {
+
     // Contract Management
     fn initialize(
         ref self: TContractState,

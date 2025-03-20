@@ -48,6 +48,8 @@ pub mod InheritX {
     #[external(v0)]
     impl IInheritXImpl of IInheritX<ContractState> {
         // Contract Management Functions
+    }
+}
 
         fn initialize(
             ref self: ContractState,

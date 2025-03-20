@@ -17,3 +17,6 @@ pub mod imple {
     pub mod InheritXSecurity;
     pub mod InheritXSwap;
 }
+
+pub mod types;
+
