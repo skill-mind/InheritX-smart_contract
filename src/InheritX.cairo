@@ -5,7 +5,7 @@ pub mod InheritX {
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
         StoragePointerWriteAccess,
     };
-    use super::super::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
+    use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
 
     #[storage]
     struct Storage {

@@ -1,6 +1,6 @@
-pub mod InheritXClaim;
-pub mod InheritXDashboard;
-pub mod InheritXPlan;
-pub mod InheritXProfile;
-pub mod InheritXSecurity;
-pub mod InheritXSwap;
+mod InheritXClaim;
+mod InheritXDashboard;
+mod InheritXPlan;
+mod InheritXProfile;
+mod InheritXSecurity;
+mod InheritXSwap;

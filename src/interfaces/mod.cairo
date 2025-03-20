@@ -1,7 +1,7 @@
-pub mod IInheritX;
-pub mod IInheritXClaim;
-pub mod IInheritXDashboard;
-pub mod IInheritXPlan;
-pub mod IInheritXProfile;
-pub mod IInheritXSecurity;
-pub mod IInheritXSwap;
+mod IInheritX;
+mod IInheritXClaim;
+mod IInheritXDashboard;
+mod IInheritXPlan;
+mod IInheritXProfile;
+mod IInheritXSecurity;
+mod IInheritXSwap;
