@@ -73,6 +73,12 @@ enum ActivityType {
 #[starknet::interface]
 trait IInheritXProfile<TContractState> {
     // Profile Management
+    fn create_profile(ref self: TContractState, username: felt252,
+        email: felt252,
+        full_name: felt252,
+        profile_image: felt252,
+        verify_identity_details: felt252
+    );
     fn get_profile(self: @TContractState, address: ContractAddress) -> UserProfile;
     fn update_profile(ref self: TContractState, profile: UserProfile);
     fn delete_profile(ref self: TContractState, address: ContractAddress);

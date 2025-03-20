@@ -15,21 +15,4 @@ use inheritx::interfaces::IInheritXPlan::{
 
 
 // Test function to set up contracts
-#[test]
-fn test_setup() {
-    // Deploy the plan contract
-    let contract_class = declare("InheritxPlan").unwrap().contract_class();
-
-    // Create a contract dispatcher
-    let (contract_address, _) = contract_class.deploy(@array![]).unwrap();
-
-    contract_address;
-
-    // Create a plan contract dispatcher
-    let plan_dispatcher = IInheritXPlanDispatcher { contract_address: contract_address };
-
-    // Now you can use the dispatcher to interact with the contract
-    // For example:
-    // let plan_id = plan_dispatcher.create_plan(...);
-}
 

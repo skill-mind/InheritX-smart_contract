@@ -164,5 +164,63 @@ pub mod InheritxClaim {
             // 14. Return the new claim_id
             panic!("Not implemented")
         }
+
+        fn approve_claim(ref self: ContractState, claim_id: u256, approver: ContractAddress) -> bool {
+            // TODO: Implement approve_claim
+            // 1. Verify claim_id exists
+            // 2. Verify the claim status is Pending (cannot approve already approved/rejected/executed claims)
+            // 3. Verify the approver is authorized (either plan owner or a guardian)
+            //    - Check with plan_contract if approver is the plan owner
+            //    - Check with security_contract if approver is a registered guardian for this plan
+            // 4. Update claim status to Approved
+            // 5. Record approval details (approver, timestamp)
+            // 6. Emit ClaimApproved event
+            // 7. Return true if successful
+            panic!("Not implemented")
+        }
+
+        fn reject_claim(ref self: ContractState, claim_id: u256, rejector: ContractAddress, reason: felt252) -> bool {
+            // TODO: Implement reject_claim
+            // 1. Verify claim_id exists
+            // 2. Verify the claim status is Pending (cannot reject already approved/rejected/executed claims)
+            // 3. Verify the rejector is authorized (either plan owner or a guardian)
+            //    - Check with plan_contract if rejector is the plan owner
+            //    - Check with security_contract if rejector is a registered guardian for this plan
+            // 4. Update claim status to Rejected
+            // 5. Record rejection details (rejector, timestamp, reason)
+            // 6. Emit ClaimRejected event
+            // 7. Return true if successful
+            panic!("Not implemented")
+        }
+
+        fn execute_claim(ref self: ContractState, claim_id: u256) -> bool {
+            // TODO: Implement execute_claim
+            // 1. Verify claim_id exists
+            // 2. Verify the claim status is Approved (can only execute approved claims)
+            // 3. Verify the caller is authorized (contract owner or system account)
+            // 4. For each token in the claim:
+            //    a. Call the token contract to transfer tokens from asset owner to beneficiary
+            //    b. Record transfer details
+            // 5. For each NFT in the claim:
+            //    a. Call the NFT contract to transfer NFT from asset owner to beneficiary
+            //    b. Record transfer details
+            // 6. Update claim status to Executed
+            // 7. Record execution timestamp
+            // 8. Update plan status in plan_contract (mark as executed)
+            // 9. Emit ClaimExecuted event
+            // 10. Return true if successful
+            panic!("Not implemented")
+        }
+
+        fn validate_claim_code(self: @ContractState, plan_id: u256, claim_code: u256) -> bool {
+            // TODO: Implement validate_claim_code
+            // 1. Convert claim_code to felt252 for storage lookup
+            // 2. Check if the claim code exists in valid_claim_codes mapping
+            // 3. Verify the claim code is associated with the given plan_id
+            //    - Get the stored claim code for the plan from plan_claim_codes
+            //    - Compare with the provided claim_code
+            // 4. Return true if the code is valid for the plan, false otherwise
+            panic!("Not implemented")
+        }
     }
 }
