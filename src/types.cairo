@@ -99,7 +99,6 @@ pub struct AssetAllocation {
 }
 
 
-
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct NFTInfo {
     pub contract_address: ContractAddress,
@@ -220,6 +219,4 @@ pub struct ActivityRecord {
     pub ip_address: felt252,
     pub device_info: felt252,
 }
-
-
 

@@ -1,12 +1,11 @@
 #[starknet::contract]
 pub mod InheritxClaim {
+    use core::array::ArrayTrait;
     use starknet::ContractAddress;
     use starknet::storage::{
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
         StoragePointerWriteAccess,
     };
-    use core::array::ArrayTrait;
-
     use crate::interfaces::IInheritXClaim::IInheritXClaim;
     #[storage]
     struct Storage {
@@ -165,10 +164,13 @@ pub mod InheritxClaim {
             panic!("Not implemented")
         }
 
-        fn approve_claim(ref self: ContractState, claim_id: u256, approver: ContractAddress) -> bool {
+        fn approve_claim(
+            ref self: ContractState, claim_id: u256, approver: ContractAddress,
+        ) -> bool {
             // TODO: Implement approve_claim
             // 1. Verify claim_id exists
-            // 2. Verify the claim status is Pending (cannot approve already approved/rejected/executed claims)
+            // 2. Verify the claim status is Pending (cannot approve already
+            // approved/rejected/executed claims)
             // 3. Verify the approver is authorized (either plan owner or a guardian)
             //    - Check with plan_contract if approver is the plan owner
             //    - Check with security_contract if approver is a registered guardian for this plan
@@ -179,10 +181,13 @@ pub mod InheritxClaim {
             panic!("Not implemented")
         }
 
-        fn reject_claim(ref self: ContractState, claim_id: u256, rejector: ContractAddress, reason: felt252) -> bool {
+        fn reject_claim(
+            ref self: ContractState, claim_id: u256, rejector: ContractAddress, reason: felt252,
+        ) -> bool {
             // TODO: Implement reject_claim
             // 1. Verify claim_id exists
-            // 2. Verify the claim status is Pending (cannot reject already approved/rejected/executed claims)
+            // 2. Verify the claim status is Pending (cannot reject already
+            // approved/rejected/executed claims)
             // 3. Verify the rejector is authorized (either plan owner or a guardian)
             //    - Check with plan_contract if rejector is the plan owner
             //    - Check with security_contract if rejector is a registered guardian for this plan

@@ -1,5 +1,5 @@
-use starknet::ContractAddress;
 use core::array::Array;
+use starknet::ContractAddress;
 
 #[starknet::interface]
 pub trait IInheritXClaim<TContractState> {
@@ -25,7 +25,9 @@ pub trait IInheritXClaim<TContractState> {
     fn approve_claim(ref self: TContractState, claim_id: u256, approver: ContractAddress) -> bool;
 
     // Function to reject invalid claims
-    fn reject_claim(ref self: TContractState, claim_id: u256, rejector: ContractAddress, reason: felt252) -> bool;
+    fn reject_claim(
+        ref self: TContractState, claim_id: u256, rejector: ContractAddress, reason: felt252,
+    ) -> bool;
 
     // Function to process approved claims
     fn execute_claim(ref self: TContractState, claim_id: u256) -> bool;

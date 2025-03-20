@@ -1,19 +1,18 @@
 #[starknet::contract]
 pub mod InheritxPlan {
+    use core::array::ArrayTrait;
+    use core::option::OptionTrait;
+    use core::traits::TryInto;
     use starknet::ContractAddress;
     use starknet::storage::{
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
         StoragePointerWriteAccess,
     };
-    use core::array::ArrayTrait;
-    use core::option::OptionTrait;
-    use core::traits::TryInto;
-
     use crate::interfaces::IInheritXPlan::IInheritXPlan;
     // Import the types from the interface
     use crate::interfaces::IInheritXPlan::{
-        PlanSection, PlanOverview, TokenInfo, SimpleBeneficiary, BeneficiaryAllocation,
-        TokenAllocation, NFTAllocation, PlanConditions, MediaMessage, PlanStatus,
+        BeneficiaryAllocation, MediaMessage, NFTAllocation, PlanConditions, PlanOverview,
+        PlanSection, PlanStatus, SimpleBeneficiary, TokenAllocation, TokenInfo,
     };
 
     #[derive(Copy, Drop, Serde, starknet::Store)]
@@ -381,7 +380,7 @@ pub mod InheritxPlan {
             // 8. Emit MediaFileAdded event
             panic!("Not implemented")
         }
-        
+
         // Statistics and Totals
         fn get_total_plans(self: @ContractState) -> u256 {
             // TODO: Implement get_total_plans
@@ -389,7 +388,7 @@ pub mod InheritxPlan {
             // This function simply returns the total number of plans created in the system
             self.plans_count.read()
         }
-        
+
         fn get_total_assets(self: @ContractState) -> u256 {
             // TODO: Implement get_total_assets
             // 1. Initialize a total value counter to 0
@@ -399,7 +398,7 @@ pub mod InheritxPlan {
             // This function calculates the total value of all assets across all plans
             panic!("Not implemented")
         }
-        
+
         fn get_total_activity(self: @ContractState) -> u64 {
             // TODO: Implement get_total_activity
             // 1. Return the activity count from storage
@@ -407,13 +406,13 @@ pub mod InheritxPlan {
             // Activities could include plan creations, modifications, executions, etc.
             panic!("Not implemented")
         }
-        
+
         fn get_plan_total_beneficiaries(self: @ContractState, plan_id: u256) -> u32 {
             // TODO: Implement get_plan_total_beneficiaries
             // 1. Assert plan_id exists (plan_id < self.plans_count.read())
             // 2. Return the plan_beneficiaries_count for the given plan_id
             // This function returns the total number of beneficiaries for a specific plan
             self.plan_beneficiaries_count.read(plan_id)
-        }       
-}
+        }
+    }
 }

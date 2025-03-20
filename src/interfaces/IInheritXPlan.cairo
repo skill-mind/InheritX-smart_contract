@@ -159,7 +159,6 @@ pub trait IInheritXPlan<TContractState> {
     fn get_total_assets(self: @TContractState) -> u256;
     fn get_total_activity(self: @TContractState) -> u64;
     fn get_plan_total_beneficiaries(self: @TContractState, plan_id: u256) -> u32;
-    
 }
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct SimpleBeneficiary {
@@ -177,6 +176,4 @@ pub struct BeneficiaryAllocation {
     pub token_allocations: Array<TokenAllocation>,
     pub nft_allocations: Array<NFTAllocation>,
 }
-
-
 

@@ -5,7 +5,7 @@ pub mod InheritX {
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
         StoragePointerWriteAccess,
     };
-    use super::super::interfaces::IInheritX::{IInheritX, InheritancePlan, AssetAllocation};
+    use super::super::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
 
     #[storage]
     struct Storage {
@@ -33,7 +33,7 @@ pub mod InheritX {
     }
 
     #[constructor]
-    fn constructor(ref self: ContractState, admin: ContractAddress) {// Initialize contract state:
+    fn constructor(ref self: ContractState, admin: ContractAddress) { // Initialize contract state:
     // 1. Set admin address
     // 2. Set default protocol parameters:
     //    - protocol_fee = 50 (0.5%)
@@ -46,7 +46,6 @@ pub mod InheritX {
     }
 
     #[external(v0)]
-    impl IInheritXImpl of IInheritX<ContractState> {
-        // Contract Management Functions
+    impl IInheritXImpl of IInheritX<ContractState> {// Contract Management Functions
     }
 }

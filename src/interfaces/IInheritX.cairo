@@ -18,6 +18,4 @@ pub struct AssetAllocation {
 }
 
 #[starknet::interface]
-pub trait IInheritX<TContractState> {
-    
-}
+pub trait IInheritX<TContractState> {}
