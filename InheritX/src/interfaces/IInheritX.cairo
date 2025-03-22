@@ -34,6 +34,10 @@ pub trait IInheritX<TContractState> {
     fn upgrade_contract(
         ref self: TContractState, contract_type: felt252, new_address: ContractAddress,
     );
+    //profile
+    fn get_profile(
+        ref self: TContractState, contract_type: felt252, new_address: ContractAddress,
+    );
 
 
     // Protocol Configuration

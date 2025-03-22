@@ -1,4 +1,4 @@
-pub mod inheritx;
+pub mod InheritX;
 pub mod interfaces {
     pub mod IInheritX;
     pub mod IInheritXClaim;
