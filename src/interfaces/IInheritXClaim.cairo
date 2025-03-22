@@ -10,6 +10,10 @@ pub trait IInheritXClaim<TContractState> {
         ref self: TContractState, plan_id: u256, beneficiary: ContractAddress, claim_code: u256,
     ) -> felt252;
 
+    // fn create_claim(
+    //     ref self: TContractState, plan_id: u256, beneficiary: ContractAddress, claim_code: u256,
+    // ) -> felt252;
+
     // Get all claims for a beneficiary
     fn get_beneficiary_claims(
         self: @TContractState, beneficiary: ContractAddress,
