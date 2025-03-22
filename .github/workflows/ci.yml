@@ -31,7 +31,7 @@ jobs:
         run: scarb fmt --check
       
       - name: Run Tests
-        run: scarb test
+        run: snforge test
       
       - name: Build Project
         run: scarb build
