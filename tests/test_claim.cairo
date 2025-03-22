@@ -163,34 +163,34 @@ fn test_collect_claim_with_wrong_code() {
   
 }
 
-// #[test]
-// #[should_panic(expected: 'You have already made a claim')]
-// fn test_collect_claim_twice() {
-//     let contract_address = setup();
-//     let dispatcher = IInheritXDispatcher { contract_address };
-//     let benefactor: ContractAddress = contract_address_const::<'benefactor'>();
-//     let beneficiary: ContractAddress = contract_address_const::<'beneficiary'>();
-//     let malicious: ContractAddress = contract_address_const::<'malicious'>();
+#[test]
+#[should_panic(expected: 'You have already made a claim')]
+fn test_collect_claim_twice() {
+    let contract_address = setup();
+    let dispatcher = IInheritXDispatcher { contract_address };
+    let benefactor: ContractAddress = contract_address_const::<'benefactor'>();
+    let beneficiary: ContractAddress = contract_address_const::<'beneficiary'>();
+    let malicious: ContractAddress = contract_address_const::<'malicious'>();
 
-//     // Test input values
-//     let name: felt252 = 'John';
-//     let email: felt252 = 'John@yahoo.com'; 
-//     let personal_message = 'i love you my son';
-//     let claim_code = 2563;
+    // Test input values
+    let name: felt252 = 'John';
+    let email: felt252 = 'John@yahoo.com'; 
+    let personal_message = 'i love you my son';
+    let claim_code = 2563;
 
-//     // Ensure the caller is the admin
-//     cheat_caller_address(contract_address, benefactor, CheatSpan::Indefinite);
+    // Ensure the caller is the admin
+    cheat_caller_address(contract_address, benefactor, CheatSpan::Indefinite);
 
-//     // Call create_claim
-//     let claim_id = dispatcher.create_claim(name, email, beneficiary, personal_message, 1000, claim_code);
+    // Call create_claim
+    let claim_id = dispatcher.create_claim(name, email, beneficiary, personal_message, 1000, claim_code);
 
-//     // Validate that the claim ID is correctly incremented
-//     assert(claim_id == 0, 'claim ID should start from 0');
-//     cheat_caller_address(contract_address, beneficiary, CheatSpan::Indefinite);
+    // Validate that the claim ID is correctly incremented
+    assert(claim_id == 0, 'claim ID should start from 0');
+    cheat_caller_address(contract_address, beneficiary, CheatSpan::Indefinite);
 
-//   let success = dispatcher.collect_claim(0, beneficiary, 2563);
+  let success = dispatcher.collect_claim(0, beneficiary, 2563);
 
-//   assert(success, 'Claim unsuccessful');
+  assert(success, 'Claim unsuccessful');
 
-//   let success2 = dispatcher.collect_claim(0, beneficiary, 2563);
-// }
+  let success2 = dispatcher.collect_claim(0, beneficiary, 2563);
+}
