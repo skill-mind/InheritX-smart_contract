@@ -12,6 +12,10 @@ Thank you for your interest in contributing to InheritX! **InheritX** is a revol
 - **Blockchain Technology:** Leveraging **StarkNet** to guarantee a decentralized, trustless, and secure environment.
 - **User-Centric Design:** Intuitive dashboards and robust identity verification for asset owners and beneficiaries.
 
+# How to Apply 
+1. Star the project
+2. Drop your TG handle
+3. Join the group `https://t.me/+xN161b3GkwNiYTZk`
 
 
 ## How to Contribute
