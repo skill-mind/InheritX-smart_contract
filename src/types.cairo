@@ -107,13 +107,17 @@ pub struct NFTInfo {
     pub estimated_value: u256,
 }
 
-#[derive(Copy, Drop, Serde, starknet::Store)]
+#[derive(Drop, Serde, starknet::Store)]
 pub struct SimpleBeneficiary {
-    pub id: u32, // Unique identifier for the beneficiary
+    pub id: u256, // Unique identifier for the beneficiary
     pub name: felt252,
     pub email: felt252,
     pub wallet_address: ContractAddress,
     pub personal_message: felt252,
+    pub amount: u256,
+    pub code: u256,
+    pub claim_status: bool,
+    pub benefactor: ContractAddress,
 }
 
 #[derive(Drop, Serde)]
