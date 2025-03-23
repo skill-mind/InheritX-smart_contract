@@ -49,16 +49,22 @@ pub mod InheritX {
     #[constructor]
     fn constructor(ref self: ContractState) { // Initialize contract state:
         // 1. Set admin address
+        self.admin.write(get_caller_address()); // Assuming the caller is the admin
         // 2. Set default protocol parameters:
-        //    - protocol_fee = 50 (0.5%)
-        //    - min_guardians = 1
-        //    - max_guardians = 5
-        //    - min_timelock = 7 days
-        //    - max_timelock = 365 days
+        self.protocol_fee.write(50);
+        self.min_guardians.write(1);
+        self.max_guardians.write(5);
+        self.min_timelock.write(604800);
+        self.max_timelock.write(31536000);
         // 3. Initialize all statistics to 0
+        self.total_plans.write(0);
+        self.active_plans.write(0);
+        self.claimed_plans.write(0);
+        self.total_value_locked.write(0);
+        self.total_fees_collected.write(0);
         // 4. Set is_paused to false
+        self.is_paused.write(false);
         self.deployed.write(true);
-        self.total_plans.write(0); // Initialize total_plans to 0
     }
 
     #[abi(embed_v0)]
