@@ -50,4 +50,5 @@ pub trait IInheritX<TContractState> {
     fn test_deployment(ref self: TContractState) -> bool;
     // Getters
     fn get_inheritance_plan(ref self: TContractState, plan_id: u256) -> InheritancePlan;
+    fn get_total_plans(self: @TContractState) -> u256;
 }
