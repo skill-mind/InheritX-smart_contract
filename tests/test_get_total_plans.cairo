@@ -1,8 +1,7 @@
 use inheritx::interfaces::IInheritX::{IInheritX, IInheritXDispatcher, IInheritXDispatcherTrait};
-use snforge_std::{ContractClassTrait, DeclareResultTrait, declare};
+use snforge_std::{CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_caller_address, declare};
 use starknet::ContractAddress;
 use starknet::contract_address::contract_address_const;
-use snforge_std::{cheat_caller_address, CheatSpan};
 
 fn setup() -> ContractAddress {
     let declare_result = declare("InheritX");
@@ -38,7 +37,7 @@ fn test_get_total_plans_after_creation() {
 
     // Test input values
     let name: felt252 = 'John';
-    let email: felt252 = 'John@yahoo.com'; 
+    let email: felt252 = 'John@yahoo.com';
     let personal_message = 'i love you my son';
     let claim_code = 2563;
 
@@ -46,7 +45,8 @@ fn test_get_total_plans_after_creation() {
     cheat_caller_address(contract_address, benefactor, CheatSpan::Indefinite);
 
     // Call create_claim to create a new plan
-    let claim_id = dispatcher.create_claim(name, email, beneficiary, personal_message, 1000, claim_code);
+    let claim_id = dispatcher
+        .create_claim(name, email, beneficiary, personal_message, 1000, claim_code);
 
     // Validate that the claim ID is correctly incremented
     assert(claim_id == 0, 'claim ID should start from 0');

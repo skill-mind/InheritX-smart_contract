@@ -99,8 +99,6 @@ pub mod InheritX {
 
             self.plans_id.write(inheritance_id + 1);
 
-
-
             // Increment the total plans count
             let total_plans = self.total_plans.read();
             self.total_plans.write(total_plans + 1);
