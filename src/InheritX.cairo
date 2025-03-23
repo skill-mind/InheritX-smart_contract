@@ -7,6 +7,8 @@ pub mod InheritX {
     use starknet::{ContractAddress, get_caller_address, get_contract_address};
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
     use crate::types::SimpleBeneficiary;
+    use core::num::traits::Zero;
+
 
     #[storage]
     struct Storage {
@@ -37,6 +39,32 @@ pub mod InheritX {
         // Dummy Mapping For transfer
         balances: Map<ContractAddress, u256>,
         deployed: bool,
+        // Plan details
+        plan_asset_owner: Map<u256, ContractAddress>, // plan_id -> asset_owner
+        plan_creation_date: Map<u256, u64>, // plan_id -> creation_date
+        plan_transfer_date: Map<u256, u64>, // plan_id -> transfer_date
+        plan_message: Map<u256, felt252>, // plan_id -> message
+        plan_total_value: Map<u256, u256>, // plan_id -> total_value
+        // Beneficiaries
+        plan_beneficiaries_count: Map<u256, u32>, // plan_id -> beneficiaries_count
+        plan_beneficiaries: Map<(u256, u32), ContractAddress>, // (plan_id, index) -> beneficiary
+        is_beneficiary: Map<
+            (u256, ContractAddress), bool,
+        >, // (plan_id, beneficiary) -> is_beneficiary
+    }
+    #[event]
+    #[derive(Copy, Drop, Debug, PartialEq, starknet::Event)]
+    enum Event {
+        BeneficiaryAdded: BeneficiaryAdded,
+    }
+
+    #[derive(Copy, Drop, Debug, PartialEq, starknet::Event)]
+    struct BeneficiaryAdded {
+        plan_id: u256,
+        beneficiary_id: u32,
+        address: ContractAddress,
+        name: felt252,
+        email: felt252,
     }
 
 
@@ -166,6 +194,71 @@ pub mod InheritX {
 
         fn get_total_plans(self: @ContractState) -> u256 {
             self.total_plans.read()
+        }
+
+        fn add_beneficiary(
+            ref self: ContractState,
+            plan_id: u256,
+            name: felt252,
+            email: felt252,
+            address: ContractAddress,
+        ) -> felt252 {
+            // Assert plan_id exists
+            assert(plan_id < self.plan_beneficiaries_count.read(plan_id), 'Invalid plan_id');
+
+            // Assert caller is the asset owner
+            let caller = starknet::get_caller_address();
+            assert(caller == self.plan_asset_owner.read(plan_id), 'Caller is not the asset owner');
+
+            // Assert plan is in valid state for modification
+            assert(
+                self.plan_transfer_date.read(plan_id) == 0, 'Plan is already executed or locked',
+            );
+
+            // Assert address is not zero
+            assert(!address.is_zero(), 'Invalid beneficiary address');
+
+            // Assert address is not already a beneficiary
+            assert(
+                !self.is_beneficiary.read((plan_id, address)), 'Address is already a beneficiary',
+            );
+
+            // Assert adding one more beneficiary won't exceed MAX_BENEFICIARIES
+            let current_count = self.plan_beneficiaries_count.read(plan_id);
+            assert(
+                current_count + 1 <= self.max_guardians.read(), 'Exceeds maximum number of beneficiaries',
+            );
+
+            // Assert name and email are not empty
+            assert(name != 0, 'Name cannot be empty');
+            assert(email != 0, 'Email cannot be empty');
+
+            // Get current beneficiary count
+            let index = current_count;
+
+            // Create a new beneficiary ID
+            let beneficiary_id = index;
+
+            // Store beneficiary address in plan_beneficiaries
+            self.plan_beneficiaries.write((plan_id, index), address);
+
+            // Set is_beneficiary mapping to true
+            self.is_beneficiary.write((plan_id, address), true);
+
+            // Increment plan_beneficiaries_count
+            self.plan_beneficiaries_count.write(plan_id, index + 1);
+            
+            self.emit(Event::BeneficiaryAdded(
+                BeneficiaryAdded {
+                    plan_id,
+                    beneficiary_id,
+                    address,
+                    name,
+                    email,
+                },
+            ));
+
+            beneficiary_id
         }
     }
 }

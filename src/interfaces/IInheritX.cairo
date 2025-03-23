@@ -41,4 +41,11 @@ pub trait IInheritX<TContractState> {
     fn transfer_funds(ref self: TContractState, beneficiary: ContractAddress, amount: u256);
     fn test_deployment(ref self: TContractState) -> bool;
     fn get_total_plans(self: @TContractState) -> u256;
+    fn add_beneficiary(
+        ref self: TContractState,
+        plan_id: u256,
+        name: felt252,
+        email: felt252,
+        address: ContractAddress,
+    ) -> felt252;
 }
