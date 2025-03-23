@@ -52,6 +52,7 @@ pub mod InheritX {
         // 3. Initialize all statistics to 0
         // 4. Set is_paused to false
         self.deployed.write(true);
+        self.total_plans.write(0); // Initialize total_plans to 0
     }
 
     #[abi(embed_v0)]
@@ -98,6 +99,10 @@ pub mod InheritX {
 
             self.plans_id.write(inheritance_id + 1);
 
+            // Increment the total plans count
+            let total_plans = self.total_plans.read();
+            self.total_plans.write(total_plans + 1);
+
             // Transfer funds as part of the claim process
             self.transfer_funds(get_contract_address(), amount);
 
@@ -136,6 +141,7 @@ pub mod InheritX {
 
             // Update the claim in storage after modifying it
             self.funds.write(inheritance_id, claim);
+
             // Return success status
             true
         }
@@ -156,6 +162,10 @@ pub mod InheritX {
         }
         fn test_deployment(ref self: ContractState) -> bool {
             self.deployed.read()
+        }
+
+        fn get_total_plans(self: @ContractState) -> u256 {
+            self.total_plans.read()
         }
     }
 }
