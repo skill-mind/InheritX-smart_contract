@@ -1,5 +1,6 @@
 use starknet::ContractAddress;
-use crate::types::SimpleBeneficiary;
+use crate::types::{SimpleBeneficiary, ActivityType, ActivityRecord};
+
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct InheritancePlan {
     owner: ContractAddress,
@@ -36,6 +37,19 @@ pub trait IInheritX<TContractState> {
         beneficiary: ContractAddress,
         claim_code: u256,
     ) -> bool;
+
+    fn record_user_activity(
+        ref self: TContracttState,
+        user: ContractAddress,
+        activity_type: ActivityType,
+        details: felt252,
+        ip_address: felt252,
+        device_info: felt252
+    ) -> u256;
+
+    fn get_user_activity(
+        ref self: TContractState, user: ContractAddress, activity_id: u256
+    ) -> ActivityRecord;
 
     fn retrieve_claim(ref self: TContractState, inheritance_id: u256) -> SimpleBeneficiary;
     fn transfer_funds(ref self: TContractState, beneficiary: ContractAddress, amount: u256);
