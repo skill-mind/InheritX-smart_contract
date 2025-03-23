@@ -2,15 +2,15 @@ use starknet::ContractAddress;
 use crate::types::SimpleBeneficiary;
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct InheritancePlan {
-    owner: ContractAddress,
-    time_lock_period: u64,
-    required_guardians: u8,
-    is_active: bool,
-    is_claimed: bool,
-    total_value: u256,
+    pub owner: ContractAddress,
+    pub time_lock_period: u64,
+    pub required_guardians: u8,
+    pub is_active: bool,
+    pub is_claimed: bool,
+    pub total_value: u256,
 }
 
-#[derive(Drop, Serde)]
+#[derive(Drop, Serde, starknet::Store, Copy)]
 pub struct AssetAllocation {
     pub token: ContractAddress,
     pub amount: u256,
@@ -37,7 +37,17 @@ pub trait IInheritX<TContractState> {
         claim_code: u256,
     ) -> bool;
 
+    fn create_inheritance_plan(
+        ref self: TContractState,
+        time_lock_period: u64,
+        required_guardians: u8,
+        guardians: Array<ContractAddress>,
+        assets: Array<AssetAllocation>,
+    ) -> u256;
+
     fn retrieve_claim(ref self: TContractState, inheritance_id: u256) -> SimpleBeneficiary;
     fn transfer_funds(ref self: TContractState, beneficiary: ContractAddress, amount: u256);
     fn test_deployment(ref self: TContractState) -> bool;
+    // Getters
+    fn get_inheritance_plan(ref self: TContractState, plan_id: u256) -> InheritancePlan;
 }
