@@ -34,16 +34,18 @@ pub mod InheritxPlan {
         owner_plans_count: Map<ContractAddress, u256>,
         // Plan details
         plan_asset_owner: Map<u256, ContractAddress>, // plan_id -> asset_owner
+        plan_status: Map<u256, PlanStatus>, // plan_id -> status
         plan_creation_date: Map<u256, u64>, // plan_id -> creation_date
         plan_transfer_date: Map<u256, u64>, // plan_id -> transfer_date
         plan_message: Map<u256, felt252>, // plan_id -> message
         plan_total_value: Map<u256, u256>, // plan_id -> total_value
         // Beneficiaries
         plan_beneficiaries_count: Map<u256, u32>, // plan_id -> beneficiaries_count
-        plan_beneficiaries: Map<(u256, u32), ContractAddress>, // (plan_id, index) -> beneficiary
+        plan_beneficiaries: Map<(u256, u32), SimpleBeneficiary>, // (plan_id, index) -> beneficiary
         is_beneficiary: Map<
             (u256, ContractAddress), bool,
         >, // (plan_id, beneficiary) -> is_beneficiary
+        max_beneficiaries: u32, // Maximum number of beneficiaries allowed per plan
         // Tokens
         plan_tokens_count: Map<u256, u32>, // plan_id -> tokens_count
         plan_tokens: Map<(u256, u32), TokenInfo>, // (plan_id, index) -> token_info
@@ -56,6 +58,7 @@ pub mod InheritxPlan {
         // Claim contract reference
         claim_contract: ContractAddress,
     }
+
 
 
     // Implementation of the interface
@@ -209,6 +212,51 @@ pub mod InheritxPlan {
         fn add_beneficiaries(
             ref self: ContractState, plan_id: u256, beneficiaries: Array<SimpleBeneficiary>,
         ) {
+    // 1. Assert plan_id exists (plan_id < self.plans_count.read())
+    assert(plan_id < self.plans_count.read(), 'Invalid plan_id');
+
+    // 2. Assert caller is the asset owner (caller == self.plan_asset_owner.read(plan_id))
+    let caller = starknet::get_caller_address();
+    let asset_owner = self.plan_asset_owner.read(plan_id);
+    assert(caller == asset_owner, 'Caller is not the asset owner');
+
+    // 3. Assert plan is in valid state for modification (not executed)
+    let plan_status = self.plan_status.read(plan_id);
+    assert(plan_status != PlanStatus::Executed, "Plan is already executed".into());
+
+    // 4. Assert beneficiaries array is not empty
+    assert(beneficiaries.len() > 0, "Beneficiaries array is empty".into());
+
+    // 5. Assert adding beneficiaries won't exceed MAX_BENEFICIARIES
+    let current_count = self.plan_beneficiaries_count.read(plan_id);
+    let new_count = current_count + beneficiaries.len();
+    assert(new_count <= self.max_beneficiaries.read(), "Exceeds maximum beneficiaries".into());
+
+    // 6. For each beneficiary in the array:
+    for beneficiary in beneficiaries.span() {
+        // a. Assert beneficiary.wallet_address is not zero
+        assert(beneficiary.wallet_address != 0, "Invalid beneficiary address".into());
+
+        // b. Assert is_beneficiary.read((plan_id, beneficiary.wallet_address)) == false (not already a beneficiary)
+        let is_already_beneficiary = self.is_beneficiary.read((plan_id, *beneficiary.wallet_address));
+        assert(!is_already_beneficiary, "Beneficiary already exists".into());
+
+        // c. Get current beneficiary count
+        let beneficiary_count = self.plan_beneficiaries_count.read(plan_id);
+
+        // d. Store beneficiary in plan_beneficiaries
+        self.plan_beneficiaries.insert((plan_id, beneficiary_count), beneficiary);
+
+        // e. Set is_beneficiary mapping to true
+        self.is_beneficiary.insert((plan_id, beneficiary.wallet_address), true);
+
+        // f. Increment plan_beneficiaries_count
+        self.plan_beneficiaries_count.insert(plan_id, beneficiary_count + 1);
+
+
+            // 7. Emit BeneficiariesAdded event
+            // TODO: Define and emit the event
+        }
             // TODO: Implement add_beneficiaries
             // 1. Assert plan_id exists (plan_id < self.plans_count.read())
             // 2. Assert caller is the asset owner (caller == self.plan_asset_owner.read(plan_id))
@@ -224,7 +272,7 @@ pub mod InheritxPlan {
             //    e. Set is_beneficiary mapping to true
             //    f. Increment plan_beneficiaries_count
             // 7. Emit BeneficiariesAdded event
-            panic!("Not implemented")
+            
         }
 
         fn set_plan_conditions(ref self: ContractState, plan_id: u256, conditions: PlanConditions) {
@@ -324,6 +372,8 @@ pub mod InheritxPlan {
             email: felt252,
             address: ContractAddress,
         ) -> felt252 {
+    
+
             // TODO: Implement add_beneficiary
             // 1. Assert plan_id exists (plan_id < self.plans_count.read())
             // 2. Assert caller is the asset owner (caller == self.plan_asset_owner.read(plan_id))

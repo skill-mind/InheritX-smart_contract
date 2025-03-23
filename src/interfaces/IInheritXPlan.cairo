@@ -85,8 +85,11 @@ pub enum PlanSection {
     MediaAndRecipients: (),
 }
 
+
 #[starknet::interface]
 pub trait IInheritXPlan<TContractState> {
+
+
     // Plan Overview Management
     fn get_plan_section(self: @TContractState, plan_id: u256, section: PlanSection) -> PlanOverview;
 
