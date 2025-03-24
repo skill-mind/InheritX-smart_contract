@@ -170,22 +170,25 @@ pub mod InheritX {
             let max_timelock = self.max_timelock.read();
             let min_guardians = self.min_guardians.read();
             let max_guardians = self.max_guardians.read();
-            
+
             // Ensure timelock period is within valid range
             assert(time_lock_period >= min_timelock, 'Timelock too short');
             assert(time_lock_period <= max_timelock, 'Timelock too long');
-            
+
             // Ensure guardian count is within valid range
             let guardian_count = guardians.len();
             assert(guardian_count >= min_guardians.into(), 'Too few guardians');
             assert(guardian_count <= max_guardians.into(), 'Too many guardians');
-            assert(required_guardians <= guardian_count.try_into().unwrap(), 'Invalid required guardians');
+            assert(
+                required_guardians <= guardian_count.try_into().unwrap(),
+                'Invalid required guardians',
+            );
             assert(required_guardians > 0, 'Need at least 1 guardian');
-            
+
             // Ensure we have at least one asset
             let asset_count = assets.len();
             assert(asset_count > 0, 'No assets specified');
-            
+
             // Calculate total value of plan
             let mut total_value: u256 = 0;
             let mut i: u32 = 0;
@@ -194,11 +197,11 @@ pub mod InheritX {
                 total_value += *asset.amount;
                 i += 1;
             }
-            
+
             // Create new plan ID
             let plan_id = self.plans_id.read();
             self.plans_id.write(plan_id + 1);
-            
+
             // Create the inheritance plan
             let new_plan = InheritancePlan {
                 owner: get_caller_address(),
@@ -208,10 +211,10 @@ pub mod InheritX {
                 is_claimed: false,
                 total_value,
             };
-            
+
             // Store the plan
             self.inheritance_plans.write(plan_id, new_plan);
-            
+
             // Store guardians
             let mut guardian_index: u8 = 0;
             i = 0;
@@ -221,7 +224,7 @@ pub mod InheritX {
                 i += 1;
             }
             self.plan_guardian_count.write(plan_id, guardian_count.try_into().unwrap());
-            
+
             // Store assets
             let mut asset_index: u8 = 0;
             i = 0;
@@ -231,17 +234,17 @@ pub mod InheritX {
                 i += 1;
             }
             self.plan_asset_count.write(plan_id, asset_count.try_into().unwrap());
-            
+
             // Update protocol statistics
             let current_total_plans = self.total_plans.read();
             self.total_plans.write(current_total_plans + 1);
-            
+
             let current_active_plans = self.active_plans.read();
             self.active_plans.write(current_active_plans + 1);
-            
+
             let current_tvl = self.total_value_locked.read();
             self.total_value_locked.write(current_tvl + total_value);
-            
+
             // Transfer assets to contract
             i = 0;
             while i < asset_count {
@@ -250,7 +253,7 @@ pub mod InheritX {
                 self.transfer_funds(get_contract_address(), *asset.amount);
                 i += 1;
             }
-            
+
             plan_id
         }
 
