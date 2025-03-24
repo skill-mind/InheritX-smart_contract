@@ -39,16 +39,16 @@ pub trait IInheritX<TContractState> {
     ) -> bool;
 
     fn record_user_activity(
-        ref self: TContracttState,
+        ref self: TContractState,
         user: ContractAddress,
         activity_type: ActivityType,
         details: felt252,
         ip_address: felt252,
-        device_info: felt252
+        device_info: felt252,
     ) -> u256;
 
     fn get_user_activity(
-        ref self: TContractState, user: ContractAddress, activity_id: u256
+        ref self: TContractState, user: ContractAddress, activity_id: u256,
     ) -> ActivityRecord;
 
     fn retrieve_claim(ref self: TContractState, inheritance_id: u256) -> SimpleBeneficiary;

@@ -2,7 +2,7 @@
 pub mod InheritX {
     use starknet::storage::{
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
-        StoragePointerWriteAccess,
+        StoragePathEntry, StoragePointerWriteAccess,
     };
     use starknet::{ContractAddress, get_caller_address, get_contract_address, get_block_timestamp};
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
@@ -45,13 +45,13 @@ pub mod InheritX {
     #[event]
     #[derive(Drop, starknet::Event)]
     pub enum Event {
-        ActivityRecordEvent: ActivityRecordEvent
+        ActivityRecordEvent: ActivityRecordEvent,
     }
 
     #[derive(Drop, starknet::Event)]
     struct ActivityRecordEvent {
         user: ContractAddress,
-        activity_id: u256
+        activity_id: u256,
     }
 
 
@@ -164,12 +164,12 @@ pub mod InheritX {
         /// @param device_info - The device information of where the activity is carried out from.
         /// @returns `u256` The id of the recorded activity.
         fn record_user_activity(
-            ref self: ContracttState,
+            ref self: ContractState,
             user: ContractAddress,
             activity_type: ActivityType,
             details: felt252,
             ip_address: felt252,
-            device_info: felt252
+            device_info: felt252,
         ) -> u256 {
             // fetch the user activities map
             let user_activities = self.user_activities.entry(user);
@@ -177,7 +177,7 @@ pub mod InheritX {
             let current_pointer = self.user_activities_pointer.entry(user).read();
             // create a record from the given details
             let record = ActivityRecord {
-                timestamp: get_block_timestamp(), activity_type, details, ip_address, device_info
+                timestamp: get_block_timestamp(), activity_type, details, ip_address, device_info,
             };
             // create the next pointer
             let next_pointer = current_pointer + 1;
@@ -186,7 +186,7 @@ pub mod InheritX {
             // Save the next pointer
             self.user_activities_pointer.entry(user).write(next_pointer);
             // Emit event
-            self.emit(ActivityRecordedEvent { user, activity_id: next_pointer })
+            self.emit(ActivityRecordEvent { user, activity_id: next_pointer });
             // return the id of the activity (next_pointer)
             next_pointer
         }
@@ -197,9 +197,9 @@ pub mod InheritX {
         /// @param activity_id - the id of the activities saved in the contract storage.
         /// @returns ActivityRecord - The record of the activity.
         fn get_user_activity(
-            ref self: ContractState, user: ContractAddress, activity_id: u256
+            ref self: ContractState, user: ContractAddress, activity_id: u256,
         ) -> ActivityRecord {
-            self.user_activities.entry(user).entry(id).read()
+            self.user_activities.entry(user).entry(activity_id).read()
         }
 
 
