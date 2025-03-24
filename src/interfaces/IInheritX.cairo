@@ -1,5 +1,8 @@
 use starknet::ContractAddress;
-use crate::types::SimpleBeneficiary;
+use crate::types::{
+    SimpleBeneficiary, PlanOverview, PlanSection, TokenInfo
+};
+
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct InheritancePlan {
     owner: ContractAddress,
@@ -38,6 +41,7 @@ pub trait IInheritX<TContractState> {
     ) -> bool;
 
     fn retrieve_claim(ref self: TContractState, inheritance_id: u256) -> SimpleBeneficiary;
+    fn get_plan_section(self: @TContractState, plan_id: u256, section: PlanSection) -> PlanOverview;
     fn transfer_funds(ref self: TContractState, beneficiary: ContractAddress, amount: u256);
     fn test_deployment(ref self: TContractState) -> bool;
 }

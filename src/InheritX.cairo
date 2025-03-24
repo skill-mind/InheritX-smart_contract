@@ -2,11 +2,12 @@
 pub mod InheritX {
     use starknet::storage::{
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
-        StoragePointerWriteAccess,
+        StoragePointerWriteAccess, Vec, VecTrait, MutableVecTrait,
     };
     use starknet::{ContractAddress, get_caller_address, get_contract_address};
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
-    use crate::types::SimpleBeneficiary;
+    use crate::types::{SimpleBeneficiary, PlanOverview, PlanSection, TokenInfo,
+         PlanConditions, PlanStatus, MediaMessage, TokenAllocation};
 
     #[storage]
     struct Storage {
@@ -37,6 +38,33 @@ pub mod InheritX {
         // Dummy Mapping For transfer
         balances: Map<ContractAddress, u256>,
         deployed: bool,
+        // Plan management
+        plans_count: u256,
+        // Beneficiaries
+        plan_beneficiaries_count: Map<u256, u32>, // plan_id -> beneficiaries_count
+        plan_beneficiaries: Map<(u256, u32), ContractAddress>, // (plan_id, index) -> beneficiary address
+        is_beneficiary: Map<(u256, ContractAddress), bool>, // (plan_id, beneficiary) -> is_beneficiary
+        beneficiary_details: Map<(u256, ContractAddress), SimpleBeneficiary>, // (plan_id, beneficiary) -> beneficiary details
+
+        // Plan details
+        plan_asset_owner: Map<u256, ContractAddress>, // plan_id -> asset_owner
+        plan_name: Map<u256, felt252>, // plan_id -> name
+        plan_description: Map<u256, felt252>, // plan_id -> description
+        plan_creation_date: Map<u256, u64>, // plan_id -> creation_date
+        plan_transfer_date: Map<u256, u64>, // plan_id -> transfer_date
+        plan_total_value: Map<u256, u256>, // plan_id -> total_value
+        plan_status: Map<u256, PlanStatus>, // plan_id -> status
+        plan_conditions: Map<u256, PlanConditions>, // plan_id -> conditions
+
+        // Tokens
+        plan_tokens_count: Map<u256, u32>, // plan_id -> tokens_count
+        plan_tokens: Map<(u256, u32), TokenInfo>, // (plan_id, index) -> token_info
+        token_allocations: Map<(u256, ContractAddress, ContractAddress), TokenAllocation>, // (plan_id, beneficiary, token) -> allocation
+
+        // Media messages
+        plan_media_messages_count: Map<u256, u32>, // plan_id -> media_messages_count
+        plan_media_messages: Map<(u256, u32), MediaMessage>, // (plan_id, index) -> media_message
+
     }
 
 
@@ -156,6 +184,87 @@ pub mod InheritX {
         }
         fn test_deployment(ref self: ContractState) -> bool {
             self.deployed.read()
+        }
+
+        /// Retrieves a specific section of a plan with detailed information.
+        /// 
+        /// @param self - The contract state.
+        /// @param plan_id - The ID of the plan to retrieve.
+        /// @param section - The specific section of the plan to retrieve (BasicInformation, Beneficiaries, or MediaAndRecipients).
+        /// @returns A PlanOverview object containing the requested section details.
+        fn get_plan_section(self: @ContractState, plan_id: u256, section: PlanSection) -> PlanOverview {
+        // Assert that the plan_id exists
+        assert(self.plans_count.read() > plan_id, 'Plan does not exist');
+
+        // Get all tokens for this plan
+        let tokens_count = self.plan_tokens_count.read(plan_id);
+        let mut tokens = ArrayTrait::new();
+        
+        for i in 0..tokens_count {
+            let token_info = self.plan_tokens.read((plan_id, i));
+            tokens.append(token_info);
+        }
+            
+        // Create a PlanOverview struct with basic details
+        let mut plan_overview = PlanOverview {
+            plan_id: plan_id,
+            name: self.plan_name.read(plan_id),       // Read from dedicated name field
+            description: self.plan_description.read(plan_id), // Read from dedicated description field
+            tokens_transferred: tokens,
+            transfer_date: self.plan_transfer_date.read(plan_id),
+            inactivity_period: self.plan_conditions.read(plan_id).inactivity_period,
+            multi_signature_enabled: self.plan_conditions.read(plan_id).multi_signature_required,
+            creation_date: self.plan_creation_date.read(plan_id),
+            status: self.plan_status.read(plan_id),
+            total_value: self.plan_total_value.read(plan_id),
+            beneficiaries: ArrayTrait::new(),
+            media_messages: ArrayTrait::new(),
+        };
+        // Fill section-specific details
+        match section {
+            PlanSection::BasicInformation => {
+                // Basic information is already filled
+            },
+            PlanSection::Beneficiaries => {
+                // Get the number of beneficiaries
+                let beneficiaries_count = self.plan_beneficiaries_count.read(plan_id);
+
+                // Iterate through each beneficiary index
+                let mut beneficiaries = ArrayTrait::new();
+                for i in 0..beneficiaries_count {
+                    let beneficiary_address = self.plan_beneficiaries.read((plan_id, i));
+                    let beneficiary = SimpleBeneficiary {
+                        id: i.into(),
+                        name: Default::default(),
+                        email: Default::default(),
+                        wallet_address: beneficiary_address,
+                        personal_message: Default::default(),
+                        amount: Default::default(),
+                        code: Default::default(),
+                        claim_status: Default::default(),
+                        benefactor: self.plan_asset_owner.read(plan_id),
+                    };
+                    beneficiaries.append(beneficiary);
+                }
+                plan_overview.beneficiaries = beneficiaries;
+            },
+            PlanSection::MediaAndRecipients => {
+                // Get the number of media messages
+                let media_messages_count = self.plan_media_messages_count.read(plan_id);
+
+                // Iterate through each media message index
+                let mut media_messages = array![];
+                for i in 0..media_messages_count {
+                    let media_message = self.plan_media_messages.read((plan_id, i));
+                    media_messages.append(media_message);
+                }
+                plan_overview.media_messages = media_messages;
+            },
+        }
+
+        // Return the PlanOverview
+        plan_overview
+
         }
     }
 }
