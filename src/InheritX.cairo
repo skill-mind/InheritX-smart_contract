@@ -1,12 +1,13 @@
 #[starknet::contract]
 pub mod InheritX {
+    use core::num::traits::Zero;
     use starknet::storage::{
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
-        StoragePointerWriteAccess,
+        StoragePathEntry, StoragePointerWriteAccess,
     };
-    use starknet::{ContractAddress, get_caller_address, get_contract_address};
+    use starknet::{ContractAddress, get_caller_address, get_contract_address, get_block_timestamp};
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
-    use crate::types::SimpleBeneficiary;
+    use crate::types::{SimpleBeneficiary, ActivityType, ActivityRecord};
 
     #[storage]
     struct Storage {
@@ -31,6 +32,21 @@ pub mod InheritX {
         pub claimed_plans: u256,
         pub total_value_locked: u256,
         pub total_fees_collected: u256,
+        // Plan details
+        plan_asset_owner: Map<u256, ContractAddress>, // plan_id -> asset_owner
+        plan_creation_date: Map<u256, u64>, // plan_id -> creation_date
+        plan_transfer_date: Map<u256, u64>, // plan_id -> transfer_date
+        plan_message: Map<u256, felt252>, // plan_id -> message
+        plan_total_value: Map<u256, u256>, // plan_id -> total_value
+        // Beneficiaries
+        plan_beneficiaries_count: Map<u256, u32>, // plan_id -> beneficiaries_count
+        plan_beneficiaries: Map<(u256, u32), ContractAddress>, // (plan_id, index) -> beneficiary
+        is_beneficiary: Map<
+            (u256, ContractAddress), bool,
+        >, // (plan_id, beneficiary) -> is_beneficiary
+        // Record user activities
+        user_activities: Map<ContractAddress, Map<u256, ActivityRecord>>,
+        user_activities_pointer: Map<ContractAddress, u256>,
         // Beneficiary to Recipient Mapping
         pub funds: Map<u256, SimpleBeneficiary>,
         pub plans_id: u256,
@@ -45,6 +61,27 @@ pub mod InheritX {
         plan_asset_count: Map<u256, u8>,
     }
 
+    #[event]
+    #[derive(Drop, starknet::Event)]
+    enum Event {
+        BeneficiaryAdded: BeneficiaryAdded,
+        ActivityRecordEvent: ActivityRecordEvent,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct BeneficiaryAdded {
+        plan_id: u256,
+        beneficiary_id: u32,
+        address: ContractAddress,
+        name: felt252,
+        email: felt252,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct ActivityRecordEvent {
+        user: ContractAddress,
+        activity_id: u256,
+    }
 
     #[constructor]
     fn constructor(ref self: ContractState) { // Initialize contract state:
@@ -111,10 +148,6 @@ pub mod InheritX {
 
             self.plans_id.write(inheritance_id + 1);
 
-            // Increment the total plans count
-            let total_plans = self.total_plans.read();
-            self.total_plans.write(total_plans + 1);
-
             // Transfer funds as part of the claim process
             self.transfer_funds(get_contract_address(), amount);
 
@@ -153,7 +186,6 @@ pub mod InheritX {
 
             // Update the claim in storage after modifying it
             self.funds.write(inheritance_id, claim);
-
             // Return success status
             true
         }
@@ -260,6 +292,134 @@ pub mod InheritX {
         fn get_inheritance_plan(ref self: ContractState, plan_id: u256) -> InheritancePlan {
             self.inheritance_plans.read(plan_id)
         }
+        
+        fn add_beneficiary(
+            ref self: ContractState,
+            plan_id: u256,
+            name: felt252,
+            email: felt252,
+            address: ContractAddress,
+        ) -> felt252 {
+            // 1. Check if plan exists by verifying asset owner
+            let asset_owner = self.plan_asset_owner.read(plan_id);
+            assert(asset_owner != address, 'Invalid plan_id');
+
+            // 2. Verify caller is asset owner
+            let caller = starknet::get_caller_address();
+            assert(caller == asset_owner, 'Caller is not the asset owner');
+
+            // 3. Check plan state
+            assert(self.plan_transfer_date.read(plan_id) == 0, 'Plan is already executed');
+
+            // 4. Validate beneficiary address
+            assert(!address.is_zero(), 'Invalid beneficiary address');
+            assert(!self.is_beneficiary.read((plan_id, address)), 'Adlready a beneficiary');
+
+            // 5. Validate input data
+            assert(name != 0, 'Name cannot be empty');
+            assert(email != 0, 'Email cannot be empty');
+
+            // 6. Get and validate beneficiary count
+            let current_count: u32 = self.plan_beneficiaries_count.read(plan_id);
+            let max_allowed: u32 = self.max_guardians.read().into();
+            assert(current_count < max_allowed, 'Exceeds max beneficiaries');
+
+            // 7. Update state
+            self.plan_beneficiaries.write((plan_id, current_count), address);
+            self.is_beneficiary.write((plan_id, address), true);
+            self.plan_beneficiaries_count.write(plan_id, current_count + 1);
+
+            self
+                .emit(
+                    Event::BeneficiaryAdded(
+                        BeneficiaryAdded {
+                            plan_id, beneficiary_id: current_count, address, name, email,
+                        },
+                    ),
+                );
+
+            // 8. Return the new beneficiary ID
+            current_count.into()
+        }
+
+        fn set_plan_asset_owner(ref self: ContractState, plan_id: u256, owner: ContractAddress) {
+            self.plan_asset_owner.write(plan_id, owner);
+        }
+
+        fn set_max_guardians(ref self: ContractState, max_guardian_number: u8) {
+            self.max_guardians.write(max_guardian_number);
+        }
+
+        fn get_plan_beneficiaries_count(self: @ContractState, plan_id: u256) -> u32 {
+            let count = self.plan_beneficiaries_count.read(plan_id);
+            count
+        }
+
+        fn get_plan_beneficiaries(
+            self: @ContractState, plan_id: u256, index: u32,
+        ) -> ContractAddress {
+            let beneficiary = self.plan_beneficiaries.read((plan_id, index));
+            beneficiary
+        }
+
+        fn get_total_plans(self: @ContractState) -> u256 {
+            let total_plans = self.total_plans.read();
+            total_plans
+        }
+
+        fn is_beneficiary(self: @ContractState, plan_id: u256, address: ContractAddress) -> bool {
+            self.is_beneficiary.read((plan_id, address))
+        }
+
+        fn set_plan_transfer_date(ref self: ContractState, plan_id: u256, date: u64) {
+            self.plan_transfer_date.write(plan_id, date);
+        }
+        /// Records the activity of a user in the system
+        /// @param self - The contract state.
+        /// @param user - The user to record for.
+        /// @param activity_type - the activity type (enum ActivityType).
+        /// @param details - The details of the activity.
+        /// @param ip_address - The ip address of where the activity is carried out from.
+        /// @param device_info - The device information of where the activity is carried out from.
+        /// @returns `u256` The id of the recorded activity.
+        fn record_user_activity(
+            ref self: ContractState,
+            user: ContractAddress,
+            activity_type: ActivityType,
+            details: felt252,
+            ip_address: felt252,
+            device_info: felt252,
+        ) -> u256 {
+            // fetch the user activities map
+            let user_activities = self.user_activities.entry(user);
+            // get the user's current activity map pointer (tracking the map index)
+            let current_pointer = self.user_activities_pointer.entry(user).read();
+            // create a record from the given details
+            let record = ActivityRecord {
+                timestamp: get_block_timestamp(), activity_type, details, ip_address, device_info,
+            };
+            // create the next pointer
+            let next_pointer = current_pointer + 1;
+            // add the record to the position of the next pointer
+            user_activities.entry(next_pointer).write(record);
+            // Save the next pointer
+            self.user_activities_pointer.entry(user).write(next_pointer);
+            // Emit event
+            self.emit(ActivityRecordEvent { user, activity_id: next_pointer });
+            // return the id of the activity (next_pointer)
+            next_pointer
+        }
+
+        /// Gets the user activity from the particular id
+        /// @param self - The contract state.
+        /// @param user - The user
+        /// @param activity_id - the id of the activities saved in the contract storage.
+        /// @returns ActivityRecord - The record of the activity.
+        fn get_user_activity(
+            ref self: ContractState, user: ContractAddress, activity_id: u256,
+        ) -> ActivityRecord {
+            self.user_activities.entry(user).entry(activity_id).read()
+        }
 
 
         // Dummy Functions
@@ -277,10 +437,6 @@ pub mod InheritX {
         }
         fn test_deployment(ref self: ContractState) -> bool {
             self.deployed.read()
-        }
-
-        fn get_total_plans(self: @ContractState) -> u256 {
-            self.total_plans.read()
         }
     }
 }
