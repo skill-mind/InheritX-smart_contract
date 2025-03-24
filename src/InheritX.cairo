@@ -1,5 +1,6 @@
 #[starknet::contract]
 pub mod InheritX {
+    use core::num::traits::Zero;
     use starknet::storage::{
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
         StoragePointerWriteAccess,
@@ -7,8 +8,6 @@ pub mod InheritX {
     use starknet::{ContractAddress, get_caller_address, get_contract_address};
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
     use crate::types::SimpleBeneficiary;
-    use core::num::traits::Zero;
-
 
     #[storage]
     struct Storage {
@@ -33,12 +32,6 @@ pub mod InheritX {
         claimed_plans: u256,
         total_value_locked: u256,
         total_fees_collected: u256,
-        // Beneficiary to Recipient Mapping
-        funds: Map<u256, SimpleBeneficiary>,
-        plans_id: u256,
-        // Dummy Mapping For transfer
-        balances: Map<ContractAddress, u256>,
-        deployed: bool,
         // Plan details
         plan_asset_owner: Map<u256, ContractAddress>, // plan_id -> asset_owner
         plan_creation_date: Map<u256, u64>, // plan_id -> creation_date
@@ -51,7 +44,14 @@ pub mod InheritX {
         is_beneficiary: Map<
             (u256, ContractAddress), bool,
         >, // (plan_id, beneficiary) -> is_beneficiary
+        // Beneficiary to Recipient Mapping
+        funds: Map<u256, SimpleBeneficiary>,
+        plans_id: u256,
+        // Dummy Mapping For transfer
+        balances: Map<ContractAddress, u256>,
+        deployed: bool,
     }
+
     #[event]
     #[derive(Copy, Drop, Debug, PartialEq, starknet::Event)]
     enum Event {
@@ -67,7 +67,6 @@ pub mod InheritX {
         email: felt252,
     }
 
-
     #[constructor]
     fn constructor(ref self: ContractState) { // Initialize contract state:
         // 1. Set admin address
@@ -80,7 +79,6 @@ pub mod InheritX {
         // 3. Initialize all statistics to 0
         // 4. Set is_paused to false
         self.deployed.write(true);
-        self.total_plans.write(0); // Initialize total_plans to 0
     }
 
     #[abi(embed_v0)]
@@ -127,10 +125,6 @@ pub mod InheritX {
 
             self.plans_id.write(inheritance_id + 1);
 
-            // Increment the total plans count
-            let total_plans = self.total_plans.read();
-            self.total_plans.write(total_plans + 1);
-
             // Transfer funds as part of the claim process
             self.transfer_funds(get_contract_address(), amount);
 
@@ -169,9 +163,90 @@ pub mod InheritX {
 
             // Update the claim in storage after modifying it
             self.funds.write(inheritance_id, claim);
-
             // Return success status
             true
+        }
+
+        fn add_beneficiary(
+            ref self: ContractState,
+            plan_id: u256,
+            name: felt252,
+            email: felt252,
+            address: ContractAddress,
+        ) -> felt252 {
+            // 1. Check if plan exists by verifying asset owner
+            let asset_owner = self.plan_asset_owner.read(plan_id);
+            assert(asset_owner != address, 'Invalid plan_id');
+
+            // 2. Verify caller is asset owner
+            let caller = starknet::get_caller_address();
+            assert(caller == asset_owner, 'Caller is not the asset owner');
+
+            // 3. Check plan state
+            assert(self.plan_transfer_date.read(plan_id) == 0, 'Plan is already executed');
+
+            // 4. Validate beneficiary address
+            assert(!address.is_zero(), 'Invalid beneficiary address');
+            assert(!self.is_beneficiary.read((plan_id, address)), 'Adlready a beneficiary');
+
+            // 5. Validate input data
+            assert(name != 0, 'Name cannot be empty');
+            assert(email != 0, 'Email cannot be empty');
+
+            // 6. Get and validate beneficiary count
+            let current_count: u32 = self.plan_beneficiaries_count.read(plan_id);
+            let max_allowed: u32 = self.max_guardians.read().into();
+            assert(current_count < max_allowed, 'Exceeds max beneficiaries');
+
+            // 7. Update state
+            self.plan_beneficiaries.write((plan_id, current_count), address);
+            self.is_beneficiary.write((plan_id, address), true);
+            self.plan_beneficiaries_count.write(plan_id, current_count + 1);
+
+            self
+                .emit(
+                    Event::BeneficiaryAdded(
+                        BeneficiaryAdded {
+                            plan_id, beneficiary_id: current_count, address, name, email,
+                        },
+                    ),
+                );
+
+            // 8. Return the new beneficiary ID
+            current_count.into()
+        }
+
+        fn set_plan_asset_owner(ref self: ContractState, plan_id: u256, owner: ContractAddress) {
+            self.plan_asset_owner.write(plan_id, owner);
+        }
+
+        fn set_max_guardians(ref self: ContractState, max_guardian_number: u8) {
+            self.max_guardians.write(max_guardian_number);
+        }
+
+        fn get_plan_beneficiaries_count(self: @ContractState, plan_id: u256) -> u32 {
+            let count = self.plan_beneficiaries_count.read(plan_id);
+            count
+        }
+
+        fn get_plan_beneficiaries(
+            self: @ContractState, plan_id: u256, index: u32,
+        ) -> ContractAddress {
+            let beneficiary = self.plan_beneficiaries.read((plan_id, index));
+            beneficiary
+        }
+
+        fn get_total_plans(self: @ContractState) -> u256 {
+            let total_plans = self.total_plans.read();
+            total_plans
+        }
+
+        fn is_beneficiary(self: @ContractState, plan_id: u256, address: ContractAddress) -> bool {
+            self.is_beneficiary.read((plan_id, address))
+        }
+
+        fn set_plan_transfer_date(ref self: ContractState, plan_id: u256, date: u64) {
+            self.plan_transfer_date.write(plan_id, date);
         }
 
 
@@ -190,75 +265,6 @@ pub mod InheritX {
         }
         fn test_deployment(ref self: ContractState) -> bool {
             self.deployed.read()
-        }
-
-        fn get_total_plans(self: @ContractState) -> u256 {
-            self.total_plans.read()
-        }
-
-        fn add_beneficiary(
-            ref self: ContractState,
-            plan_id: u256,
-            name: felt252,
-            email: felt252,
-            address: ContractAddress,
-        ) -> felt252 {
-            // Assert plan_id exists
-            assert(plan_id < self.plan_beneficiaries_count.read(plan_id), 'Invalid plan_id');
-
-            // Assert caller is the asset owner
-            let caller = starknet::get_caller_address();
-            assert(caller == self.plan_asset_owner.read(plan_id), 'Caller is not the asset owner');
-
-            // Assert plan is in valid state for modification
-            assert(
-                self.plan_transfer_date.read(plan_id) == 0, 'Plan is already executed or locked',
-            );
-
-            // Assert address is not zero
-            assert(!address.is_zero(), 'Invalid beneficiary address');
-
-            // Assert address is not already a beneficiary
-            assert(
-                !self.is_beneficiary.read((plan_id, address)), 'Address is already a beneficiary',
-            );
-
-            // Assert adding one more beneficiary won't exceed MAX_BENEFICIARIES
-            let current_count = self.plan_beneficiaries_count.read(plan_id);
-            assert(
-                current_count + 1 <= self.max_guardians.read(), 'Exceeds maximum number of beneficiaries',
-            );
-
-            // Assert name and email are not empty
-            assert(name != 0, 'Name cannot be empty');
-            assert(email != 0, 'Email cannot be empty');
-
-            // Get current beneficiary count
-            let index = current_count;
-
-            // Create a new beneficiary ID
-            let beneficiary_id = index;
-
-            // Store beneficiary address in plan_beneficiaries
-            self.plan_beneficiaries.write((plan_id, index), address);
-
-            // Set is_beneficiary mapping to true
-            self.is_beneficiary.write((plan_id, address), true);
-
-            // Increment plan_beneficiaries_count
-            self.plan_beneficiaries_count.write(plan_id, index + 1);
-            
-            self.emit(Event::BeneficiaryAdded(
-                BeneficiaryAdded {
-                    plan_id,
-                    beneficiary_id,
-                    address,
-                    name,
-                    email,
-                },
-            ));
-
-            beneficiary_id
         }
     }
 }

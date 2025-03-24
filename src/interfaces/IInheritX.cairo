@@ -37,10 +37,6 @@ pub trait IInheritX<TContractState> {
         claim_code: u256,
     ) -> bool;
 
-    fn retrieve_claim(ref self: TContractState, inheritance_id: u256) -> SimpleBeneficiary;
-    fn transfer_funds(ref self: TContractState, beneficiary: ContractAddress, amount: u256);
-    fn test_deployment(ref self: TContractState) -> bool;
-    fn get_total_plans(self: @TContractState) -> u256;
     fn add_beneficiary(
         ref self: TContractState,
         plan_id: u256,
@@ -48,4 +44,16 @@ pub trait IInheritX<TContractState> {
         email: felt252,
         address: ContractAddress,
     ) -> felt252;
+
+
+    fn is_beneficiary(self: @TContractState, plan_id: u256, address: ContractAddress) -> bool;
+    fn get_plan_beneficiaries(self: @TContractState, plan_id: u256, index: u32 ) -> ContractAddress;
+    fn get_total_plans(self: @TContractState) -> u256;
+    fn get_plan_beneficiaries_count(self: @TContractState, plan_id: u256) -> u32;
+    fn set_max_guardians(ref self: TContractState, max_guardian_number: u8);
+    fn set_plan_transfer_date(ref self: TContractState, plan_id: u256, date: u64);
+    fn set_plan_asset_owner(ref self: TContractState, plan_id: u256, owner: ContractAddress);
+    fn retrieve_claim(ref self: TContractState, inheritance_id: u256) -> SimpleBeneficiary;
+    fn transfer_funds(ref self: TContractState, beneficiary: ContractAddress, amount: u256);
+    fn test_deployment(ref self: TContractState) -> bool;
 }
