@@ -156,6 +156,53 @@ pub mod InheritX {
             self.funds.read(inheritance_id)
         }
 
+        /// Retrieves a beneficiary by their wallet address.
+        /// @param self - The contract state.
+        /// @param beneficiary_address - The wallet address of the beneficiary to find.
+        /// @returns The `SimpleBeneficiary` struct if found, or a default SimpleBeneficiary if not
+        /// found.
+        /// @dev This function iterates through all plans to find a beneficiary with the specified
+        /// address.
+        ///      If no matching beneficiary is found, it returns a default SimpleBeneficiary with
+        ///      all fields zeroed.
+        fn get_beneficiary_by_address(
+            self: @ContractState, beneficiary_address: ContractAddress,
+        ) -> SimpleBeneficiary {
+            // Get the total number of plans
+            let total_plans = self.plans_id.read();
+
+            // Initialize a variable to store the found beneficiary
+            let mut current_id: u256 = 0;
+
+            // Iterate through all plans to find a matching beneficiary
+            while current_id != total_plans {
+                let beneficiary = self.funds.read(current_id);
+
+                // Check if the wallet address matches
+                if beneficiary.wallet_address == beneficiary_address {
+                    return beneficiary;
+                }
+
+                // Move to the next plan
+                current_id = current_id + 1;
+            }
+
+            // Return a default SimpleBeneficiary if no matching beneficiary is found
+            let zero_address: ContractAddress = 0.try_into().unwrap();
+
+            SimpleBeneficiary {
+                id: 0,
+                name: 0,
+                email: 0,
+                wallet_address: zero_address,
+                personal_message: 0,
+                amount: 0,
+                code: 0,
+                claim_status: false,
+                benefactor: zero_address,
+            }
+        }
+
         fn transfer_funds(ref self: ContractState, beneficiary: ContractAddress, amount: u256) {
             let current_bal = self.balances.read(beneficiary);
             self.balances.write(beneficiary, current_bal + amount);
