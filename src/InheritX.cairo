@@ -8,6 +8,8 @@ pub mod InheritX {
     use starknet::{ContractAddress, get_caller_address, get_contract_address, get_block_timestamp};
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
     use crate::types::{SimpleBeneficiary, ActivityType, ActivityRecord};
+    use core::num::traits::Zero;
+    use starknet::{ContractAddress, get_caller_address};
 
     #[storage]
     struct Storage {
@@ -53,6 +55,13 @@ pub mod InheritX {
         // Dummy Mapping For transfer
         balances: Map<ContractAddress, u256>,
         deployed: bool,
+        plan_status: Map<u256, felt252>,
+    }
+
+      mod PlanStatus {
+        pub const ACTIVE: felt252 = 1;
+        pub const DELETED: felt252 = 2;
+        pub const PAUSED: felt252 = 3;
     }
 
     #[event]
@@ -322,5 +331,20 @@ pub mod InheritX {
         fn test_deployment(ref self: ContractState) -> bool {
             self.deployed.read()
         }
+                fn can_delete_plan(self: @ContractState, plan_id: u256) -> bool {
+            // 1. Validate plan_id is not zero
+            assert(!plan_id.is_zero(), 'Plan ID cannot be zero');
+
+            // 2. Check if plan exists by verifying asset owner
+            let asset_owner = self.plan_asset_owner.read(plan_id);
+            assert(!asset_owner.is_zero(), 'Plan does not exist');
+
+            // 3. Get the caller address
+            let caller = get_caller_address();
+
+            // 4. Verify caller is the asset owner
+            if caller != asset_owner {
+                return false;
+            }
     }
 }
