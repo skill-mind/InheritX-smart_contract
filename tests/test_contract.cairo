@@ -1,13 +1,13 @@
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use starknet::{ContractAddress, contract_address_const};
-    use inheritx::interfaces::IInheritX::{IInheritXDispatcher, IInheritXDispatcherTrait};
     use inheritx::InheritX::InheritX;
+    use inheritx::interfaces::IInheritX::{IInheritXDispatcher, IInheritXDispatcherTrait};
     use snforge_std::{
-        declare, DeclareResultTrait, ContractClassTrait, stop_cheat_caller_address,
-        start_cheat_caller_address,
+        ContractClassTrait, DeclareResultTrait, declare, start_cheat_caller_address,
+        stop_cheat_caller_address,
     };
+    use starknet::{ContractAddress, contract_address_const};
+    use super::*;
 
     // Sets up the environment for testing
     fn set_up() -> (IInheritXDispatcher, ContractAddress) {

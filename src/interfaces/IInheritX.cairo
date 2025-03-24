@@ -1,5 +1,5 @@
 use starknet::ContractAddress;
-use crate::types::{SimpleBeneficiary, ActivityType, ActivityRecord};
+use crate::types::{ActivityRecord, ActivityType, SimpleBeneficiary};
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct InheritancePlan {

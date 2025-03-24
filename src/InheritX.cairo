@@ -2,12 +2,12 @@
 pub mod InheritX {
     use core::num::traits::Zero;
     use starknet::storage::{
-        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
-        StoragePathEntry, StoragePointerWriteAccess,
+        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePathEntry,
+        StoragePointerReadAccess, StoragePointerWriteAccess,
     };
-    use starknet::{ContractAddress, get_caller_address, get_contract_address, get_block_timestamp};
+    use starknet::{ContractAddress, get_block_timestamp, get_caller_address, get_contract_address};
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
-    use crate::types::{SimpleBeneficiary, ActivityType, ActivityRecord};
+    use crate::types::{ActivityRecord, ActivityType, SimpleBeneficiary};
 
     #[storage]
     struct Storage {
@@ -292,7 +292,7 @@ pub mod InheritX {
         fn get_inheritance_plan(ref self: ContractState, plan_id: u256) -> InheritancePlan {
             self.inheritance_plans.read(plan_id)
         }
-        
+
         fn add_beneficiary(
             ref self: ContractState,
             plan_id: u256,
