@@ -47,7 +47,7 @@ pub trait IInheritX<TContractState> {
 
 
     fn is_beneficiary(self: @TContractState, plan_id: u256, address: ContractAddress) -> bool;
-    fn get_plan_beneficiaries(self: @TContractState, plan_id: u256, index: u32 ) -> ContractAddress;
+    fn get_plan_beneficiaries(self: @TContractState, plan_id: u256, index: u32) -> ContractAddress;
     fn get_total_plans(self: @TContractState) -> u256;
     fn get_plan_beneficiaries_count(self: @TContractState, plan_id: u256) -> u32;
     fn set_max_guardians(ref self: TContractState, max_guardian_number: u8);
