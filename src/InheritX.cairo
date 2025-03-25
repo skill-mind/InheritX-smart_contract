@@ -322,5 +322,45 @@ pub mod InheritX {
         fn test_deployment(ref self: ContractState) -> bool {
             self.deployed.read()
         }
+
+        fn get_activity_history(
+            self: @ContractState, 
+            user: ContractAddress, 
+            start_index: u256, 
+            page_size: u256
+        ) -> Array<ActivityRecord> {
+            assert(page_size > 0, 'Page size must be positive');
+            let total_activity_count = self.user_activities_pointer.entry(user).read();
+    
+            let mut activity_history = ArrayTrait::new();
+    
+            let end_index = if start_index + page_size > total_activity_count {
+                total_activity_count
+            } else {
+                start_index + page_size
+            };
+    
+            // Iterate and collect activity records
+            let mut current_index = start_index + 1;
+            loop {
+                if current_index > end_index {
+                    break;
+                }
+    
+                let record = self.user_activities.entry(user).entry(current_index).read();
+                activity_history.append(record);
+    
+                current_index += 1;
+            };
+    
+            activity_history
+        }
+    
+        fn get_activity_history_length(
+            self: @ContractState, 
+            user: ContractAddress
+        ) -> u256 {
+            self.user_activities_pointer.entry(user).read()
+        }
     }
 }

@@ -1,4 +1,5 @@
 #[cfg(test)]
+pub mod test_activity_history;
 pub mod test_record_activity;
 pub mod test_claim;
 pub mod test_contract;
