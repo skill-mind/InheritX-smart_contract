@@ -4,11 +4,13 @@ use crate::types::{ActivityRecord, ActivityType, SimpleBeneficiary};
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct InheritancePlan {
     pub owner: ContractAddress,
-    pub time_lock_period: u64,
-    pub required_guardians: u8,
+    // pub time_lock_period: u64,
+    // pub required_guardians: u8,
     pub is_active: bool,
     pub is_claimed: bool,
     pub total_value: u256,
+    pub plan_name: felt252,
+    pub description: felt252,
 }
 
 #[derive(Drop, Serde, starknet::Store, Copy)]
@@ -40,10 +42,10 @@ pub trait IInheritX<TContractState> {
 
     fn create_inheritance_plan(
         ref self: TContractState,
-        time_lock_period: u64,
-        required_guardians: u8,
-        guardians: Array<ContractAddress>,
-        assets: Array<AssetAllocation>,
+        plan_name: felt252,
+        tokens: Array<AssetAllocation>,
+        description: felt252,
+        pick_beneficiaries: Array<ContractAddress>,
     ) -> u256;
 
     fn retrieve_claim(ref self: TContractState, inheritance_id: u256) -> SimpleBeneficiary;
