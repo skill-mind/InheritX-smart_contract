@@ -228,7 +228,7 @@ pub mod InheritX {
                 let asset = assets.at(i);
                 total_value += *asset.amount;
                 i += 1;
-            }
+            };
 
             // Create new plan ID
             let plan_id = self.plans_id.read();
@@ -254,7 +254,7 @@ pub mod InheritX {
                 self.plan_guardians.write((plan_id, guardian_index), *guardians.at(i));
                 guardian_index += 1;
                 i += 1;
-            }
+            };
             self.plan_guardian_count.write(plan_id, guardian_count.try_into().unwrap());
 
             // Store assets
@@ -264,7 +264,7 @@ pub mod InheritX {
                 self.plan_assets.write((plan_id, asset_index), *assets.at(i));
                 asset_index += 1;
                 i += 1;
-            }
+            };
             self.plan_asset_count.write(plan_id, asset_count.try_into().unwrap());
 
             // Update protocol statistics
@@ -284,7 +284,7 @@ pub mod InheritX {
                 // In production, this would call actual token transfers
                 self.transfer_funds(get_contract_address(), *asset.amount);
                 i += 1;
-            }
+            };
 
             plan_id
         }
