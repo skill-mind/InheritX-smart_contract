@@ -68,7 +68,7 @@ pub trait IInheritX<TContractState> {
     fn retrieve_claim(ref self: TContractState, inheritance_id: u256) -> SimpleBeneficiary;
     fn transfer_funds(ref self: TContractState, beneficiary: ContractAddress, amount: u256);
     fn test_deployment(ref self: TContractState) -> bool;
-    fn get_total_plans(self: @TContractState) -> u256;
+    // fn get_total_plans(self: @TContractState) -> u256;
     
     // Media Preview
     fn get_media_preview_url(self: @TContractState, plan_id: u256, file_hash: felt252) -> felt252;

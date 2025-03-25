@@ -329,9 +329,9 @@ pub mod InheritX {
             self.deployed.read()
         }
 
-        fn get_total_plans(self: @ContractState) -> u256 {
-            self.total_plans.read()
-        }
+        // fn get_total_plans(self: @ContractState) -> u256 {
+        //     self.total_plans.read()
+        // }
 
         fn get_media_preview_url(
             self: @ContractState, plan_id: u256, file_hash: felt252
