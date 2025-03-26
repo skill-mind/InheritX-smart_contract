@@ -70,7 +70,7 @@ pub struct MediaMessage {
     upload_date: u64,
 }
 
-#[derive(Copy, Drop, Serde)]
+#[derive(Copy, Drop, Serde, starknet::Store, PartialEq)]
 pub enum PlanStatus {
     Draft,
     Active,
@@ -176,4 +176,3 @@ pub struct BeneficiaryAllocation {
     pub token_allocations: Array<TokenAllocation>,
     pub nft_allocations: Array<NFTAllocation>,
 }
-

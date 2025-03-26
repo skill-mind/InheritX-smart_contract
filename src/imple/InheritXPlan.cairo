@@ -12,7 +12,7 @@ pub mod InheritxPlan {
     // Import the types from the interface
     use crate::interfaces::IInheritXPlan::{
         BeneficiaryAllocation, MediaMessage, NFTAllocation, PlanConditions, PlanOverview,
-        PlanSection, PlanStatus, SimpleBeneficiary, TokenAllocation, TokenInfo,
+        PlanSection, PlanStatus, SimpleBeneficiary, TokenAllocation, TokenInfo
     };
 
     #[derive(Copy, Drop, Serde, starknet::Store)]
@@ -38,6 +38,7 @@ pub mod InheritxPlan {
         plan_transfer_date: Map<u256, u64>, // plan_id -> transfer_date
         plan_message: Map<u256, felt252>, // plan_id -> message
         plan_total_value: Map<u256, u256>, // plan_id -> total_value
+        plan_status: Map<u256, PlanStatus>, // plan_id -> status
         // Beneficiaries
         plan_beneficiaries_count: Map<u256, u32>, // plan_id -> beneficiaries_count
         plan_beneficiaries: Map<(u256, u32), ContractAddress>, // (plan_id, index) -> beneficiary
@@ -57,6 +58,18 @@ pub mod InheritxPlan {
         claim_contract: ContractAddress,
     }
 
+    #[derive(Drop, starknet::Event)]
+    pub struct PlanOverridden {
+        pub plan_id: u256,
+        pub caller: ContractAddress,
+    }
+
+    // Events
+    #[event]
+    #[derive(Drop, starknet::Event)]
+    enum Event {
+        PlanOverridden: PlanOverridden,
+    }
 
     // Implementation of the interface
     #[abi(embed_v0)]
@@ -143,12 +156,22 @@ pub mod InheritxPlan {
         fn override_plan(ref self: ContractState, plan_id: u256) {
             // TODO: Implement override_plan
             // 1. Assert plan_id exists (plan_id < self.plans_count.read())
+            let plans_count = self.plans_count.read();
+            assert(plan_id < plans_count, 'Plan ID does not exist');
             // 2. Assert caller is the asset owner (caller == self.plan_asset_owner.read(plan_id))
+            let caller = starknet::get_caller_address();
+            let owner = self.plan_asset_owner.read(plan_id);
+            assert!(caller == owner, "Not plan owner");
             // 3. Assert plan is in valid state for override (not executed)
-            // 4. Assert override conditions are met (can_override_plan returns true)
+            let status = self.plan_status.read(plan_id);
+            assert(status != PlanStatus::Executed, 'Already executed');
+             // 4. Assert override conditions are met (can_override_plan returns true)
+            let can_override = self.can_override_plan(plan_id);
+            assert(can_override, 'Cannot override plan');
             // 5. Update plan status to Cancelled
+            self.plan_status.write(plan_id, PlanStatus::Cancelled);
             // 6. Emit PlanOverridden event
-            panic!("Not implemented")
+            self.emit(PlanOverridden { plan_id, caller });
         }
 
         fn delete_plan(ref self: ContractState, plan_id: u256) {
