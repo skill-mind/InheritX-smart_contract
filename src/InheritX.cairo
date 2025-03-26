@@ -8,7 +8,7 @@ pub mod InheritX {
     use starknet::{ContractAddress, get_caller_address, get_contract_address, get_block_timestamp};
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
     use crate::types::{SimpleBeneficiary, ActivityType, ActivityRecord};
-
+    use crate::interfaces::IInheritXPlan::{IInheritXPlanDispatcher, IInheritXPlanDispatcherTrait};
     #[storage]
     struct Storage {
         // Contract addresses for component management
@@ -293,6 +293,25 @@ pub mod InheritX {
             // return the id of the activity (next_pointer)
             next_pointer
         }
+        fn can_override_plan(self: @ContractState, plan_id: u256) -> bool {          
+            let plan_contract_address = self.plan_contract.read();            
+           
+            if plan_contract_address.is_zero() {
+                return false; 
+            }            
+    
+            if self.is_paused.read() {
+                return false; // Protocol is paused, can't perform override operations
+            }
+            
+            let plan_contract = IInheritXPlanDispatcher { 
+                contract_address: plan_contract_address 
+            };           
+       
+            let can_override = plan_contract.can_override_plan(plan_id);
+           
+            can_override
+        }
 
         /// Gets the user activity from the particular id
         /// @param self - The contract state.
@@ -322,5 +341,7 @@ pub mod InheritX {
         fn test_deployment(ref self: ContractState) -> bool {
             self.deployed.read()
         }
+
+        
     }
 }

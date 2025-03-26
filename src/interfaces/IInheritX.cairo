@@ -1,5 +1,5 @@
 use starknet::ContractAddress;
-use crate::types::{SimpleBeneficiary, ActivityType, ActivityRecord};
+use crate::types::{ActivityRecord, ActivityType, SimpleBeneficiary};
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct InheritancePlan {
@@ -64,8 +64,8 @@ pub trait IInheritX<TContractState> {
     fn get_user_activity(
         ref self: TContractState, user: ContractAddress, activity_id: u256,
     ) -> ActivityRecord;
-
     fn retrieve_claim(ref self: TContractState, inheritance_id: u256) -> SimpleBeneficiary;
     fn transfer_funds(ref self: TContractState, beneficiary: ContractAddress, amount: u256);
     fn test_deployment(ref self: TContractState) -> bool;
+    fn can_override_plan(self: @TContractState, plan_id: u256) -> bool;
 }
