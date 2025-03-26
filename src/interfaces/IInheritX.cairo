@@ -18,6 +18,13 @@ pub struct AssetAllocation {
     pub percentage: u8,
 }
 
+#[derive(Copy, Drop, Serde)]
+pub struct MediaMessage {
+    pub plan_id: felt252,       
+    pub media_type: felt252,    
+    pub media_content: felt252  
+}
+
 #[starknet::interface]
 pub trait IInheritX<TContractState> {
     // Initialize a new claim with a claim code
