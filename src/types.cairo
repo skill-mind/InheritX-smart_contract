@@ -23,6 +23,7 @@ pub struct TokenInfo {
     pub price: u256,
 }
 
+
 #[derive(Drop, Serde)]
 pub struct BeneficiaryInfo {
     name: felt252,
@@ -127,7 +128,7 @@ pub struct BeneficiaryAllocation {
     pub nft_allocations: Array<NFTAllocation>,
 }
 
-#[derive(Drop, Serde)]
+#[derive(Drop, Serde, starknet::Store)]
 pub struct UserProfile {
     pub address: ContractAddress,
     pub username: felt252,
@@ -136,7 +137,7 @@ pub struct UserProfile {
     pub profile_image: felt252,
     pub verification_status: VerificationStatus,
     pub role: UserRole,
-    pub connected_wallets: Array<WalletInfo>,
+    // pub connected_wallets: Array<WalletInfo>,
     pub notification_settings: NotificationSettings,
     pub security_settings: SecuritySettings,
     pub created_at: u64,
@@ -152,41 +153,47 @@ pub struct WalletInfo {
     pub added_date: u64,
 }
 
-#[derive(Copy, Drop, Serde, starknet::Store)]
-pub struct NotificationSettings {
-    pub email_notifications: bool,
-    pub push_notifications: bool,
-    pub claim_alerts: bool,
-    pub plan_updates: bool,
-    pub security_alerts: bool,
-    pub marketing_updates: bool,
+#[derive(Drop, Serde, starknet::Store, Default)]
+pub enum NotificationSettings {
+    #[default]
+    Default,
+    email_notifications,
+    push_notifications,
+    claim_alerts,
+    plan_updates,
+    security_alerts,
+    marketing_updates,
 }
 
-#[derive(Drop, Serde)]
-pub struct SecuritySettings {
-    pub two_factor_enabled: bool,
-    pub recovery_email: felt252,
-    pub backup_guardians: Array<ContractAddress>,
-    pub auto_lock_period: u64,
-    pub allowed_ips: Array<felt252>,
+#[derive(Drop, Serde, starknet::Store, Default)]
+pub enum SecuritySettings {
+    #[default]
+    Two_factor_enabled,
+    recovery_email,
+    backup_guardians,
+    auto_lock_period,
+    allowed_ips,
 }
 
-#[derive(Copy, Drop, Serde)]
-enum UserRole {
-    Owner: (),
-    Beneficiary: (),
-    Guardian: (),
-    Admin: (),
-}
 
-#[derive(Copy, Drop, Serde)]
+#[derive(Drop, Serde, starknet::Store, Default)]
 pub enum VerificationStatus {
-    Unverified: (),
-    PendingVerification: (),
-    Verified: (),
-    Rejected: (),
+    #[default]
+    Unverified,
+    PendingVerification,
+    Verified,
+    Rejected,
 }
 
+#[derive(Drop, Serde, starknet::Store, Default)]
+pub enum UserRole {
+    #[default]
+    User,
+    Owner,
+    Beneficiary,
+    Guardian,
+    Admin,
+}
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub enum ActivityType {
     #[default]
