@@ -30,29 +30,28 @@ fn test_get_activity_history_pagination() {
     let user = contract_address_const::<'user'>();
 
     // Record multiple activities
-    let _activity1_id = inheritX.record_user_activity(
-        user, 
-        ActivityType::Login, 
-        'First login', 
-        '192.168.1.1', 
-        'Desktop Chrome'
-    );
+    let _activity1_id = inheritX
+        .record_user_activity(
+            user, ActivityType::Login, 'First login', '192.168.1.1', 'Desktop Chrome',
+        );
 
-    let _activity2_id = inheritX.record_user_activity(
-        user, 
-        ActivityType::ProfileUpdate, 
-        'Profile details updated', 
-        '192.168.1.2', 
-        'Mobile Safari'
-    );
+    let _activity2_id = inheritX
+        .record_user_activity(
+            user,
+            ActivityType::ProfileUpdate,
+            'Profile details updated',
+            '192.168.1.2',
+            'Mobile Safari',
+        );
 
-    let _activity3_id = inheritX.record_user_activity(
-        user, 
-        ActivityType::WalletConnection, 
-        'Wallet connected', 
-        '192.168.1.3', 
-        'Mobile Android'
-    );
+    let _activity3_id = inheritX
+        .record_user_activity(
+            user,
+            ActivityType::WalletConnection,
+            'Wallet connected',
+            '192.168.1.3',
+            'Mobile Android',
+        );
 
     // Check total history length
     let history_length = inheritX.get_activity_history_length(user);
@@ -68,7 +67,7 @@ fn test_get_activity_history_pagination() {
 }
 
 #[test]
-#[should_panic(expected: ('Page size must be positive', ))]
+#[should_panic(expected: ('Page size must be positive',))]
 fn test_get_activity_history_invalid_page_size() {
     let inheritX = setup();
     let user = contract_address_const::<'user'>();

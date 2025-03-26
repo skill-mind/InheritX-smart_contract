@@ -56,16 +56,10 @@ pub trait IInheritX<TContractState> {
     fn test_deployment(ref self: TContractState) -> bool;
 
     fn get_activity_history(
-        self: @TContractState, 
-        user: ContractAddress, 
-        start_index: u256, 
-        page_size: u256
+        self: @TContractState, user: ContractAddress, start_index: u256, page_size: u256,
     ) -> Array<ActivityRecord>;
-    
-    fn get_activity_history_length(
-        self: @TContractState, 
-        user: ContractAddress
-    ) -> u256;
+
+    fn get_activity_history_length(self: @TContractState, user: ContractAddress) -> u256;
     fn get_total_plans(self: @TContractState) -> u256;
     fn create_profile(
         ref self: TContractState,
