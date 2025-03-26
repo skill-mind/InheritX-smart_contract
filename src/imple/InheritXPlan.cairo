@@ -12,7 +12,7 @@ pub mod InheritxPlan {
     // Import the types from the interface
     use crate::interfaces::IInheritXPlan::{
         BeneficiaryAllocation, MediaMessage, NFTAllocation, PlanConditions, PlanOverview,
-        PlanSection, PlanStatus, SimpleBeneficiary, TokenAllocation, TokenInfo
+        PlanSection, PlanStatus, SimpleBeneficiary, TokenAllocation, TokenInfo,
     };
 
     #[derive(Copy, Drop, Serde, starknet::Store)]
@@ -165,7 +165,7 @@ pub mod InheritxPlan {
             // 3. Assert plan is in valid state for override (not executed)
             let status = self.plan_status.read(plan_id);
             assert(status != PlanStatus::Executed, 'Already executed');
-             // 4. Assert override conditions are met (can_override_plan returns true)
+            // 4. Assert override conditions are met (can_override_plan returns true)
             let can_override = self.can_override_plan(plan_id);
             assert(can_override, 'Cannot override plan');
             // 5. Update plan status to Cancelled
