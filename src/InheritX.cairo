@@ -1,6 +1,7 @@
 #[starknet::contract]
 pub mod InheritX {
     use core::num::traits::Zero;
+    use core::traits::Into;
     use starknet::storage::{
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
         StoragePathEntry, StoragePointerWriteAccess,
@@ -8,6 +9,7 @@ pub mod InheritX {
     use starknet::{ContractAddress, get_caller_address, get_contract_address, get_block_timestamp};
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
     use crate::types::{SimpleBeneficiary, ActivityType, ActivityRecord};
+
 
     #[storage]
     struct Storage {
@@ -53,6 +55,11 @@ pub mod InheritX {
         // Dummy Mapping For transfer
         balances: Map<ContractAddress, u256>,
         deployed: bool,
+        //Identity verification system
+        verification_code: Map<ContractAddress, felt252>,
+        verification_status: Map<ContractAddress, bool>,
+        verification_attempts: Map<ContractAddress, u8>,
+        verification_expiry: Map<ContractAddress, u64>,
     }
 
     #[event]
@@ -321,6 +328,59 @@ pub mod InheritX {
         }
         fn test_deployment(ref self: ContractState) -> bool {
             self.deployed.read()
+        }
+        fn start_verification(ref self: ContractState, user: ContractAddress) -> felt252 {
+            assert(!self.verification_status.read(user), 'Already verified');
+
+            // Generate random code
+            // let code = self.generate_verification_code(user);
+            let code = 123456;
+
+            // store code with expiry
+            let expiry = get_block_timestamp() + 600; // 10 minutes in seconds
+            self.verification_code.write(user, code);
+            self.verification_expiry.write(user, expiry);
+            self.verification_attempts.write(user, 0);
+
+            // send code to user via SMS or email
+            code
+        }
+        fn check_expiry(ref self: ContractState, user: ContractAddress) -> bool {
+            let expiry = self.verification_expiry.read(user);
+            assert(get_block_timestamp() < expiry, 'Code expired');
+            true
+        }
+
+        fn complete_verififcation(ref self: ContractState, user: ContractAddress, code: felt252) {
+            // check attempts
+            let attempts = self.verification_attempts.read(user);
+            assert(attempts < 3, 'Maximum attempts reached');
+
+            // check expiry
+            let check_expiry = self.check_expiry(user);
+            assert_eq!(check_expiry, true);
+
+            // verify code
+            self.get_verification_status(code, user);
+        }
+
+        fn get_verification_status(
+            ref self: ContractState, code: felt252, user: ContractAddress,
+        ) -> bool {
+            let stored_code = self.verification_code.read(user);
+            let attempts = self.verification_attempts.read(user);
+            if stored_code == code {
+                self.verification_status.write(user, true);
+                true
+            } else {
+                self.verification_attempts.write(user, attempts + 1);
+                false
+            }
+        }
+
+        /// Check verification status
+        fn is_verified(self: @ContractState, user: ContractAddress) -> bool {
+            self.verification_status.read(user)
         }
     }
 }
