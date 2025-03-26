@@ -1,5 +1,5 @@
 use starknet::ContractAddress;
-use crate::types::{SimpleBeneficiary, ActivityType, ActivityRecord};
+use crate::types::{SimpleBeneficiary, ActivityType, ActivityRecord, UserProfile};
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct InheritancePlan {
@@ -38,20 +38,6 @@ pub trait IInheritX<TContractState> {
         claim_code: u256,
     ) -> bool;
 
-    fn add_beneficiary(
-        ref self: TContractState,
-        plan_id: u256,
-        name: felt252,
-        email: felt252,
-        address: ContractAddress,
-    ) -> felt252;
-    fn is_beneficiary(self: @TContractState, plan_id: u256, address: ContractAddress) -> bool;
-    fn get_plan_beneficiaries(self: @TContractState, plan_id: u256, index: u32) -> ContractAddress;
-    fn get_total_plans(self: @TContractState) -> u256;
-    fn get_plan_beneficiaries_count(self: @TContractState, plan_id: u256) -> u32;
-    fn set_max_guardians(ref self: TContractState, max_guardian_number: u8);
-    fn set_plan_transfer_date(ref self: TContractState, plan_id: u256, date: u64);
-    fn set_plan_asset_owner(ref self: TContractState, plan_id: u256, owner: ContractAddress);
     fn record_user_activity(
         ref self: TContractState,
         user: ContractAddress,
@@ -68,4 +54,19 @@ pub trait IInheritX<TContractState> {
     fn retrieve_claim(ref self: TContractState, inheritance_id: u256) -> SimpleBeneficiary;
     fn transfer_funds(ref self: TContractState, beneficiary: ContractAddress, amount: u256);
     fn test_deployment(ref self: TContractState) -> bool;
+
+    fn get_activity_history(
+        self: @TContractState, user: ContractAddress, start_index: u256, page_size: u256,
+    ) -> Array<ActivityRecord>;
+
+    fn get_activity_history_length(self: @TContractState, user: ContractAddress) -> u256;
+    fn get_total_plans(self: @TContractState) -> u256;
+    fn create_profile(
+        ref self: TContractState,
+        username: felt252,
+        email: felt252,
+        full_name: felt252,
+        profile_image: felt252,
+    ) -> bool;
+    fn get_profile(ref self: TContractState, address: ContractAddress) -> UserProfile;
 }
