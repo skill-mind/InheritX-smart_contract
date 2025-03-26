@@ -187,8 +187,10 @@ pub enum VerificationStatus {
     Rejected: (),
 }
 
-#[derive(Copy, Drop, Serde)]
+#[derive(Copy, Drop, Serde, starknet::Store)]
 pub enum ActivityType {
+    #[default]
+    Void,
     Login: (),
     ProfileUpdate: (),
     WalletConnection: (),
@@ -215,7 +217,7 @@ pub struct VerificationRecord {
     pub data_hash: felt252,
 }
 
-#[derive(Drop, Serde)]
+#[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct ActivityRecord {
     pub timestamp: u64,
     pub activity_type: ActivityType,

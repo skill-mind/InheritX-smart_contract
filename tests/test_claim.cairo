@@ -8,7 +8,6 @@ use starknet::class_hash::ClassHash;
 use starknet::contract_address::contract_address_const;
 use starknet::testing::{set_caller_address, set_contract_address};
 
-
 fn setup() -> ContractAddress {
     let declare_result = declare("InheritX");
     assert(declare_result.is_ok(), 'Contract declaration failed');
