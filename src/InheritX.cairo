@@ -1,13 +1,15 @@
 #[starknet::contract]
 pub mod InheritX {
-    use core::num::traits::Zero;
     use starknet::storage::{
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePathEntry,
         StoragePointerReadAccess, StoragePointerWriteAccess,
     };
     use starknet::{ContractAddress, get_block_timestamp, get_caller_address, get_contract_address};
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
-    use crate::types::{ActivityRecord, ActivityType, SimpleBeneficiary};
+    use crate::types::{
+        SimpleBeneficiary, ActivityType, ActivityRecord, UserProfile, VerificationStatus, UserRole,
+        SecuritySettings, NotificationSettings,
+    };
 
     #[storage]
     struct Storage {
@@ -51,22 +53,13 @@ pub mod InheritX {
         // storage mappings for plan_name and description
         plan_names: Map<u256, felt252>,
         plan_descriptions: Map<u256, felt252>,
+        user_profiles: Map<ContractAddress, UserProfile>,
     }
 
     #[event]
     #[derive(Drop, starknet::Event)]
-    enum Event {
-        BeneficiaryAdded: BeneficiaryAdded,
+    pub enum Event {
         ActivityRecordEvent: ActivityRecordEvent,
-    }
-
-    #[derive(Drop, starknet::Event)]
-    struct BeneficiaryAdded {
-        plan_id: u256,
-        beneficiary_id: u32,
-        address: ContractAddress,
-        name: felt252,
-        email: felt252,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -74,6 +67,13 @@ pub mod InheritX {
         user: ContractAddress,
         activity_id: u256,
     }
+    //     #[derive(Copy, Drop, Serde)]
+    //  enum VerificationStatus {
+    //     Unverified,
+    //     PendingVerification,
+    //     Verified,
+    //     Rejected,
+    // }
 
     #[constructor]
     fn constructor(ref self: ContractState) {
@@ -90,6 +90,7 @@ pub mod InheritX {
         self.total_fees_collected.write(0);
         self.is_paused.write(false);
         self.deployed.write(true);
+        self.total_plans.write(0); // Initialize total_plans to 0
     }
 
     #[abi(embed_v0)]
@@ -205,10 +206,61 @@ pub mod InheritX {
             };
             self.funds.write(inheritance_id, new_beneficiary);
             self.plans_id.write(inheritance_id + 1);
+
+            // Increment the total plans count
+            let total_plans = self.total_plans.read();
+            self.total_plans.write(total_plans + 1);
+
+            // Transfer funds as part of the claim process
             self.transfer_funds(get_contract_address(), amount);
             inheritance_id
         }
+        /// Creates a new user profile and stores it in the contract state.
+        ///
+        /// @param self - Reference to the contract state.
+        /// @param username - The user's chosen username.
+        /// @param email - The user's email address.
+        /// @param full_name - The user's full name.
+        /// @param profile_image - A reference to the user's profile image.
+        /// @return bool - Returns `true` if the profile is created successfully.
+        fn create_profile(
+            ref self: ContractState,
+            username: felt252,
+            email: felt252,
+            full_name: felt252,
+            profile_image: felt252,
+        ) -> bool {
+            // Create a new UserProfile with the provided values and defaults.
+            // We assume `self.contract_address` returns the caller's or contract's address.
+            // For connected_wallets, notification_settings, and security_settings, we assume
+            // there are default constructors or values available.
+            let new_profile = UserProfile {
+                address: get_caller_address(),
+                username: username,
+                email: email,
+                full_name: full_name,
+                profile_image: profile_image,
+                verification_status: VerificationStatus::Unverified,
+                role: UserRole::User,
+                notification_settings: NotificationSettings::Default,
+                security_settings: SecuritySettings::Two_factor_enabled,
+                created_at: get_block_timestamp(),
+                last_active: get_block_timestamp(),
+            };
 
+            // Store the new profile in the contract state's user_profiles mapping.
+            // Here we assume `user_profiles` is a mapping from an address to UserProfile.
+            self.user_profiles.write(new_profile.address, new_profile);
+
+            true
+        }
+
+        /// Allows a beneficiary to collect their claim.
+        /// @param self - The contract state.
+        /// @param inheritance_id - The ID of the inheritance claim.
+        /// @param beneficiary - The wallet address of the beneficiary.
+        /// @param claim_code - The unique code to verify the claim.
+        /// @returns `true` if the claim is successfully collected, otherwise `false`.
         fn collect_claim(
             ref self: ContractState,
             inheritance_id: u256,
@@ -318,6 +370,17 @@ pub mod InheritX {
             self.user_activities.entry(user).entry(activity_id).read()
         }
 
+        fn get_profile(ref self: ContractState, address: ContractAddress) -> UserProfile {
+            let user = self.user_profiles.read(address);
+            user
+        }
+
+
+        // Dummy Functions
+        /// Retrieves the details of a claim using the inheritance ID.
+        /// @param self - The contract state.
+        /// @param inheritance_id - The ID of the inheritance claim.
+        /// @returns The `SimpleBeneficiary` struct containing the claim details.
         fn retrieve_claim(ref self: ContractState, inheritance_id: u256) -> SimpleBeneficiary {
             self.funds.read(inheritance_id)
         }
