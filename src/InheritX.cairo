@@ -280,38 +280,34 @@ pub mod InheritX {
         fn test_deployment(ref self: ContractState) -> bool {
             self.deployed.read()
         }
+        
+                /// Adds a media message to a specific plan.
+        /// @param self - The contract state.
+        /// @param plan_id - The ID of the plan.
+        /// @param media_type - The type of media (e.g., 0 for image, 1 for video).
+        /// @param media_content - The content of the media (e.g., IPFS hash or URL as felt252).
+        #[external]
+        fn add_media_message(
+            ref self: ContractState,
+            plan_id: u256,
+            media_type: felt252,
+            media_content: felt252,
+        ) {
+            // Get the current count of media messages for the plan
+            let current_count = self.media_message_count.read(plan_id);
 
-        // Storage variable to track the number of media messages for each plan
-        @storage_var
-        func media_message_count(plan_id: felt252) -> (count: u256):  // Tracks the number of messages
-        end
+            // Create a new media message
+            let new_message = MediaMessage {
+                plan_id: plan_id,
+                media_type: media_type,
+                media_content: media_content,
+            };
 
-        // Storage variable to store media messages for each plan by index
-        @storage_var
-        func media_messages(plan_id: felt252, index: u256) -> (message: MediaMessage):  // Stores messages by index
-        end
+            // Store the new message at the next index
+            self.media_messages.write((plan_id, current_count), new_message);
 
-        @external
-        fn add_media_message(plan_id: felt252, media_type: felt252, media_content: felt252):
-        alloc_locals
-
-        // Get the current count of media messages for the plan
-        let (current_count) = media_message_count.read(plan_id)
-
-        // Create a new media message
-        let new_message = MediaMessage {
-            plan_id: plan_id,
-            media_type: media_type,
-            media_content: media_content,
+            // Increment the message count for the plan
+            self.media_message_count.write(plan_id, current_count + 1);
         }
-
-        // Store the new message at the next index
-        media_messages.write((plan_id, current_count), new_message)
-
-        // Increment the message count for the plan
-        media_message_count.write(plan_id, current_count + 1)
-
-        return ()
-        end
     }
 }
