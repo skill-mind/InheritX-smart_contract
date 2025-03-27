@@ -25,6 +25,15 @@ pub struct MediaMessage {
     pub media_content: felt252  
 }
 
+// New Wallet struct to represent user wallets
+#[derive(Drop, Serde, starknet::Store)]
+pub struct Wallet {
+    address: ContractAddress,
+    is_primary: bool,
+    wallet_type: felt252, // e.g., 'personal', 'inheritance', 'business'
+    added_at: u64
+}
+
 #[starknet::interface]
 pub trait IInheritX<TContractState> {
     // Initialize a new claim with a claim code
@@ -76,4 +85,41 @@ pub trait IInheritX<TContractState> {
         profile_image: felt252,
     ) -> bool;
     fn get_profile(ref self: TContractState, address: ContractAddress) -> UserProfile;
+
+     // New Wallet Management Methods
+
+    /// Add a new wallet for a user
+    /// @param wallet - The wallet address to add
+    /// @param wallet_type - Type of wallet (e.g., 'personal', 'inheritance')
+    /// @return bool - Indicates if wallet was successfully added
+    fn add_wallet(
+        ref self: TContractState, 
+        wallet: ContractAddress, 
+        wallet_type: felt252
+    ) -> bool;
+
+    /// Set a specific wallet as the primary wallet for a user
+    /// @param wallet - The wallet address to set as primary
+    /// @return bool - Indicates if wallet was successfully set as primary
+    fn set_primary_wallet(
+        ref self: TContractState, 
+        wallet: ContractAddress
+    ) -> bool;
+
+    /// Get the primary wallet for a user
+    /// @param user - The user address
+    /// @return ContractAddress - The primary wallet address
+    fn get_primary_wallet(
+        self: @TContractState, 
+        user: ContractAddress
+    ) -> ContractAddress;
+
+    /// Get all wallets for a user
+    /// @param user - The user address
+    /// @return Array<Wallet> - Array of user's wallets
+    fn get_user_wallets(
+        self: @TContractState, 
+        user: ContractAddress
+    ) -> Array<Wallet>;
+
 }
