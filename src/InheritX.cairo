@@ -284,6 +284,7 @@ pub mod InheritX {
             self.deployed.read()
         }
 
+
         fn delete_user_profile(ref self: ContractState, address: ContractAddress) -> bool {
             let admin = self.admin.read();
             let mut user = self.user_profiles.read(address);
@@ -314,6 +315,36 @@ pub mod InheritX {
         fn get_user(ref self: ContractState, address: ContractAddress) -> UserProfile {
             let user = self.user_profiles.read(address);
             user
+
+        
+                /// Adds a media message to a specific plan.
+        /// @param self - The contract state.
+        /// @param plan_id - The ID of the plan.
+        /// @param media_type - The type of media (e.g., 0 for image, 1 for video).
+        /// @param media_content - The content of the media (e.g., IPFS hash or URL as felt252).
+        #[external]
+        fn add_media_message(
+            ref self: ContractState,
+            plan_id: u256,
+            media_type: felt252,
+            media_content: felt252,
+        ) {
+            // Get the current count of media messages for the plan
+            let current_count = self.media_message_count.read(plan_id);
+
+            // Create a new media message
+            let new_message = MediaMessage {
+                plan_id: plan_id,
+                media_type: media_type,
+                media_content: media_content,
+            };
+
+            // Store the new message at the next index
+            self.media_messages.write((plan_id, current_count), new_message);
+
+            // Increment the message count for the plan
+            self.media_message_count.write(plan_id, current_count + 1);
+
         }
         /// Adds a media message to a specific plan.
     /// @param self - The contract state.

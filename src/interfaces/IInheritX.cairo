@@ -23,6 +23,9 @@ pub struct MediaMessage {
     pub plan_id: felt252,
     pub media_type: felt252,
     pub media_content: felt252,
+    pub plan_id: felt252,       
+    pub media_type: felt252,    
+    pub media_content: felt252  
 }
 
 #[starknet::interface]
