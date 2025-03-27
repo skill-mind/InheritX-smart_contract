@@ -1,12 +1,16 @@
 #[cfg(test)]
 mod tests {
     use inheritx::InheritX::InheritX;
-    use inheritx::interfaces::IInheritX::{IInheritXDispatcher, IInheritXDispatcherTrait};
+    use inheritx::interfaces::IInheritX::{
+        AssetAllocation, IInheritX, IInheritXDispatcher, IInheritXDispatcherTrait,
+    };
     use inheritx::types::ActivityType;
     use snforge_std::{
-        ContractClassTrait, DeclareResultTrait, declare, start_cheat_caller_address,
-        stop_cheat_caller_address,
+        CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_caller_address, declare,
+        start_cheat_caller_address, stop_cheat_caller_address,
     };
+    use starknet::class_hash::ClassHash;
+    use starknet::testing::{set_caller_address, set_contract_address};
     use starknet::{ContractAddress, contract_address_const};
     use super::*;
 
@@ -20,18 +24,6 @@ mod tests {
         let dispatcher = IInheritXDispatcher { contract_address };
 
         (dispatcher, contract_address)
-    }
-
-
-    #[test]
-    fn test_initial_data() {
-        let (IInheritXDispatcher, contract_address) = setup();
-
-        let dispatcher = IInheritXDispatcher { contract_address };
-        // Ensure dispatcher methods exist
-        let deployed = dispatcher.test_deployment();
-
-        assert(deployed == true, 'deployment failed');
     }
 
     #[test]
@@ -150,5 +142,79 @@ mod tests {
 
         // Should panic with zero page size
         dispatcher.get_activity_history(user, 0, 0);
+    }
+
+    #[test]
+    fn test_initial_data() {
+        let (dispatcher, contract_address) = setup();
+
+        // Ensure dispatcher methods exist
+        let deployed = dispatcher.test_deployment();
+
+        assert(deployed, 'deployment failed');
+    }
+
+    #[test]
+    fn test_create_inheritance_plan() {
+        let (dispatcher, contract_address) = setup();
+        let benefactor: ContractAddress = contract_address_const::<'benefactor'>();
+        let beneficiary: ContractAddress = contract_address_const::<'beneficiary'>();
+        let pick_beneficiaries: Array<ContractAddress> = array![beneficiary];
+        let assets: Array<AssetAllocation> = array![
+            AssetAllocation { token: benefactor, amount: 1000, percentage: 50 },
+            AssetAllocation { token: beneficiary, amount: 1000, percentage: 50 },
+        ];
+        let plan_name: felt252 = 'plan1';
+        let description: felt252 = 'plan_desc';
+
+        // Ensure the caller is the admin
+        // cheat_caller_address(contract_address, benefactor, CheatSpan::Indefinite);
+
+        // Call create_inheritance_plan
+        let plan_id = dispatcher
+            .create_inheritance_plan(plan_name, assets, description, pick_beneficiaries);
+
+        // assert(plan_id == 1, 'create_inheritance_plan failed');
+        let plan = dispatcher.get_inheritance_plan(plan_id);
+        assert(plan.is_active, 'is_active mismatch');
+        assert(!plan.is_claimed, 'is_claimed mismatch');
+        assert(plan.total_value == 2000, 'total_value mismatch');
+    }
+
+    #[test]
+    #[should_panic(expected: ('No assets specified',))]
+    fn test_create_inheritance_plan_no_assets() {
+        let (dispatcher, contract_address) = setup();
+        let benefactor: ContractAddress = contract_address_const::<'benefactor'>();
+        let pick_beneficiaries: Array<ContractAddress> = array![benefactor];
+        let plan_name: felt252 = 'plan1';
+        let description: felt252 = 'plan_desc';
+
+        // Ensure the caller is the admin
+        // cheat_caller_address(contract_address, benefactor, CheatSpan::Indefinite);
+
+        // Test with no assets
+        let assets: Array<AssetAllocation> = array![];
+        dispatcher.create_inheritance_plan(plan_name, assets, description, pick_beneficiaries);
+    }
+
+    #[test]
+    #[should_panic(expected: ('No beneficiaries specified',))]
+    fn test_create_inheritance_plan_no_beneficiaries() {
+        let (dispatcher, contract_address) = setup();
+        let benefactor: ContractAddress = contract_address_const::<'benefactor'>();
+        let beneficiary: ContractAddress = contract_address_const::<'beneficiary'>();
+        let pick_beneficiaries: Array<ContractAddress> = array![];
+        let plan_name: felt252 = 'plan1';
+        let description: felt252 = 'plan_desc';
+
+        // Ensure the caller is the admin
+        // cheat_caller_address(contract_address, benefactor, CheatSpan::Indefinite);
+
+        let assets: Array<AssetAllocation> = array![
+            AssetAllocation { token: benefactor, amount: 1000, percentage: 50 },
+            AssetAllocation { token: beneficiary, amount: 1000, percentage: 50 },
+        ];
+        dispatcher.create_inheritance_plan(plan_name, assets, description, pick_beneficiaries);
     }
 }
