@@ -1,5 +1,6 @@
 #[starknet::contract]
 pub mod InheritX {
+    use core::num::traits::Zero;
     use starknet::storage::{
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePathEntry,
         StoragePointerReadAccess, StoragePointerWriteAccess,
@@ -60,12 +61,22 @@ pub mod InheritX {
     #[derive(Drop, starknet::Event)]
     pub enum Event {
         ActivityRecordEvent: ActivityRecordEvent,
+        BeneficiaryAdded: BeneficiaryAdded,
     }
 
     #[derive(Drop, starknet::Event)]
     struct ActivityRecordEvent {
         user: ContractAddress,
         activity_id: u256,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct BeneficiaryAdded {
+        plan_id: u256,
+        beneficiary_id: u32,
+        address: ContractAddress,
+        name: felt252,
+        email: felt252,
     }
     //     #[derive(Copy, Drop, Serde)]
     //  enum VerificationStatus {
@@ -116,7 +127,7 @@ pub mod InheritX {
                 let asset = tokens.at(i);
                 total_value += *asset.amount;
                 i += 1;
-            }
+            };
 
             // Generate new plan ID
             let plan_id = self.plans_id.read();
@@ -148,7 +159,7 @@ pub mod InheritX {
                 self.plan_assets.write((plan_id, asset_index), *tokens.at(i));
                 asset_index += 1;
                 i += 1;
-            }
+            };
             self.plan_asset_count.write(plan_id, asset_count.try_into().unwrap());
 
             // Store beneficiaries
@@ -160,7 +171,7 @@ pub mod InheritX {
                 self.is_beneficiary.write((plan_id, beneficiary), true);
                 beneficiary_index += 1;
                 i += 1;
-            }
+            };
             self.plan_beneficiaries_count.write(plan_id, beneficiary_count);
 
             // Update protocol statistics
@@ -177,7 +188,7 @@ pub mod InheritX {
                 let asset = tokens.at(i);
                 self.transfer_funds(get_contract_address(), *asset.amount);
                 i += 1;
-            }
+            };
 
             // Return the plan ID
             plan_id
@@ -393,27 +404,22 @@ pub mod InheritX {
         fn test_deployment(ref self: ContractState) -> bool {
             self.deployed.read()
         }
-        
-                /// Adds a media message to a specific plan.
+
+        /// Adds a media message to a specific plan.
         /// @param self - The contract state.
         /// @param plan_id - The ID of the plan.
         /// @param media_type - The type of media (e.g., 0 for image, 1 for video).
         /// @param media_content - The content of the media (e.g., IPFS hash or URL as felt252).
         #[external]
         fn add_media_message(
-            ref self: ContractState,
-            plan_id: u256,
-            media_type: felt252,
-            media_content: felt252,
+            ref self: ContractState, plan_id: u256, media_type: felt252, media_content: felt252,
         ) {
             // Get the current count of media messages for the plan
             let current_count = self.media_message_count.read(plan_id);
 
             // Create a new media message
             let new_message = MediaMessage {
-                plan_id: plan_id,
-                media_type: media_type,
-                media_content: media_content,
+                plan_id: plan_id, media_type: media_type, media_content: media_content,
             };
 
             // Store the new message at the next index
