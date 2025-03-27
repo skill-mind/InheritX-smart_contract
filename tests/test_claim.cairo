@@ -1,6 +1,4 @@
 // Import the contract modules
-use inheritx::imple::InheritXClaim::InheritxClaim;
-use inheritx::imple::InheritXPlan::InheritxPlan;
 use inheritx::interfaces::IInheritX::{IInheritX, IInheritXDispatcher, IInheritXDispatcherTrait};
 use snforge_std::{CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_caller_address, declare};
 use starknet::ContractAddress;

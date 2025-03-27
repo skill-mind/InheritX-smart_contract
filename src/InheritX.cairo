@@ -57,6 +57,15 @@ pub mod InheritX {
         user_profiles: Map<ContractAddress, UserProfile>,
     }
 
+    #[derive(Drop, starknet::Event)]
+    struct BeneficiaryAdded {
+        plan_id: u256,
+        beneficiary_id: u32,
+        address: ContractAddress,
+        name: felt252,
+        email: felt252,
+    }
+
     #[event]
     #[derive(Drop, starknet::Event)]
     pub enum Event {
@@ -68,15 +77,6 @@ pub mod InheritX {
     struct ActivityRecordEvent {
         user: ContractAddress,
         activity_id: u256,
-    }
-
-    #[derive(Drop, starknet::Event)]
-    struct BeneficiaryAdded {
-        plan_id: u256,
-        beneficiary_id: u32,
-        address: ContractAddress,
-        name: felt252,
-        email: felt252,
     }
     //     #[derive(Copy, Drop, Serde)]
     //  enum VerificationStatus {
@@ -218,22 +218,13 @@ pub mod InheritX {
             self.funds.write(inheritance_id, new_beneficiary);
             self.plans_id.write(inheritance_id + 1);
 
-            // Increment the total plans count
             let total_plans = self.total_plans.read();
             self.total_plans.write(total_plans + 1);
 
-            // Transfer funds as part of the claim process
             self.transfer_funds(get_contract_address(), amount);
             inheritance_id
         }
-        /// Creates a new user profile and stores it in the contract state.
-        ///
-        /// @param self - Reference to the contract state.
-        /// @param username - The user's chosen username.
-        /// @param email - The user's email address.
-        /// @param full_name - The user's full name.
-        /// @param profile_image - A reference to the user's profile image.
-        /// @return bool - Returns `true` if the profile is created successfully.
+
         fn create_profile(
             ref self: ContractState,
             username: felt252,
@@ -241,10 +232,6 @@ pub mod InheritX {
             full_name: felt252,
             profile_image: felt252,
         ) -> bool {
-            // Create a new UserProfile with the provided values and defaults.
-            // We assume `self.contract_address` returns the caller's or contract's address.
-            // For connected_wallets, notification_settings, and security_settings, we assume
-            // there are default constructors or values available.
             let new_profile = UserProfile {
                 address: get_caller_address(),
                 username: username,
@@ -259,19 +246,11 @@ pub mod InheritX {
                 last_active: get_block_timestamp(),
             };
 
-            // Store the new profile in the contract state's user_profiles mapping.
-            // Here we assume `user_profiles` is a mapping from an address to UserProfile.
             self.user_profiles.write(new_profile.address, new_profile);
 
             true
         }
 
-        /// Allows a beneficiary to collect their claim.
-        /// @param self - The contract state.
-        /// @param inheritance_id - The ID of the inheritance claim.
-        /// @param beneficiary - The wallet address of the beneficiary.
-        /// @param claim_code - The unique code to verify the claim.
-        /// @returns `true` if the claim is successfully collected, otherwise `false`.
         fn collect_claim(
             ref self: ContractState,
             inheritance_id: u256,
@@ -287,72 +266,8 @@ pub mod InheritX {
             self.funds.write(inheritance_id, claim);
             true
         }
-
         fn get_inheritance_plan(ref self: ContractState, plan_id: u256) -> InheritancePlan {
             self.inheritance_plans.read(plan_id)
-        }
-
-        fn add_beneficiary(
-            ref self: ContractState,
-            plan_id: u256,
-            name: felt252,
-            email: felt252,
-            address: ContractAddress,
-        ) -> felt252 {
-            let asset_owner = self.plan_asset_owner.read(plan_id);
-            assert(asset_owner != address, 'Invalid plan_id');
-            let caller = starknet::get_caller_address();
-            assert(caller == asset_owner, 'Caller is not the asset owner');
-            assert(self.plan_transfer_date.read(plan_id) == 0, 'Plan is already executed');
-            assert(!address.is_zero(), 'Invalid beneficiary address');
-            assert(!self.is_beneficiary.read((plan_id, address)), 'Adlready a beneficiary');
-            assert(name != 0, 'Name cannot be empty');
-            assert(email != 0, 'Email cannot be empty');
-            let current_count: u32 = self.plan_beneficiaries_count.read(plan_id);
-            let max_allowed: u32 = self.max_guardians.read().into();
-            assert(current_count < max_allowed, 'Exceeds max beneficiaries');
-            self.plan_beneficiaries.write((plan_id, current_count), address);
-            self.is_beneficiary.write((plan_id, address), true);
-            self.plan_beneficiaries_count.write(plan_id, current_count + 1);
-            self
-                .emit(
-                    Event::BeneficiaryAdded(
-                        BeneficiaryAdded {
-                            plan_id, beneficiary_id: current_count, address, name, email,
-                        },
-                    ),
-                );
-            current_count.into()
-        }
-
-        fn set_plan_asset_owner(ref self: ContractState, plan_id: u256, owner: ContractAddress) {
-            self.plan_asset_owner.write(plan_id, owner);
-        }
-
-        fn set_max_guardians(ref self: ContractState, max_guardian_number: u8) {
-            self.max_guardians.write(max_guardian_number);
-        }
-
-        fn get_plan_beneficiaries_count(self: @ContractState, plan_id: u256) -> u32 {
-            self.plan_beneficiaries_count.read(plan_id)
-        }
-
-        fn get_plan_beneficiaries(
-            self: @ContractState, plan_id: u256, index: u32,
-        ) -> ContractAddress {
-            self.plan_beneficiaries.read((plan_id, index))
-        }
-
-        fn get_total_plans(self: @ContractState) -> u256 {
-            self.total_plans.read()
-        }
-
-        fn is_beneficiary(self: @ContractState, plan_id: u256, address: ContractAddress) -> bool {
-            self.is_beneficiary.read((plan_id, address))
-        }
-
-        fn set_plan_transfer_date(ref self: ContractState, plan_id: u256, date: u64) {
-            self.plan_transfer_date.write(plan_id, date);
         }
 
         fn record_user_activity(
@@ -386,12 +301,6 @@ pub mod InheritX {
             user
         }
 
-
-        // Dummy Functions
-        /// Retrieves the details of a claim using the inheritance ID.
-        /// @param self - The contract state.
-        /// @param inheritance_id - The ID of the inheritance claim.
-        /// @returns The `SimpleBeneficiary` struct containing the claim details.
         fn retrieve_claim(ref self: ContractState, inheritance_id: u256) -> SimpleBeneficiary {
             self.funds.read(inheritance_id)
         }
@@ -405,28 +314,120 @@ pub mod InheritX {
             self.deployed.read()
         }
 
-        /// Adds a media message to a specific plan.
-        /// @param self - The contract state.
-        /// @param plan_id - The ID of the plan.
-        /// @param media_type - The type of media (e.g., 0 for image, 1 for video).
-        /// @param media_content - The content of the media (e.g., IPFS hash or URL as felt252).
-        #[external]
-        fn add_media_message(
-            ref self: ContractState, plan_id: u256, media_type: felt252, media_content: felt252,
-        ) {
-            // Get the current count of media messages for the plan
-            let current_count = self.media_message_count.read(plan_id);
+        fn add_beneficiary(
+            ref self: ContractState,
+            plan_id: u256,
+            name: felt252,
+            email: felt252,
+            address: ContractAddress,
+        ) -> felt252 {
+            // 1. Check if plan exists by verifying asset owner
+            let asset_owner = self.plan_asset_owner.read(plan_id);
+            assert(asset_owner != address, 'Invalid plan_id');
 
-            // Create a new media message
-            let new_message = MediaMessage {
-                plan_id: plan_id, media_type: media_type, media_content: media_content,
+            // 2. Verify caller is asset owner
+            let caller = starknet::get_caller_address();
+            assert(caller == asset_owner, 'Caller is not the asset owner');
+
+            // 3. Check plan state
+            assert(self.plan_transfer_date.read(plan_id) == 0, 'Plan is already executed');
+
+            // 4. Validate beneficiary address
+            assert(!address.is_zero(), 'Invalid beneficiary address');
+            assert(!self.is_beneficiary.read((plan_id, address)), 'Adlready a beneficiary');
+
+            // 5. Validate input data
+            assert(name != 0, 'Name cannot be empty');
+            assert(email != 0, 'Email cannot be empty');
+
+            // 6. Get and validate beneficiary count
+            let current_count: u32 = self.plan_beneficiaries_count.read(plan_id);
+            let max_allowed: u32 = self.max_guardians.read().into();
+            assert(current_count < max_allowed, 'Exceeds max beneficiaries');
+
+            // 7. Update state
+            self.plan_beneficiaries.write((plan_id, current_count), address);
+            self.is_beneficiary.write((plan_id, address), true);
+            self.plan_beneficiaries_count.write(plan_id, current_count + 1);
+
+            self
+                .emit(
+                    Event::BeneficiaryAdded(
+                        BeneficiaryAdded {
+                            plan_id, beneficiary_id: current_count, address, name, email,
+                        },
+                    ),
+                );
+
+            // 8. Return the new beneficiary ID
+            current_count.into()
+        }
+
+        fn set_plan_asset_owner(ref self: ContractState, plan_id: u256, owner: ContractAddress) {
+            self.plan_asset_owner.write(plan_id, owner);
+        }
+
+        fn set_max_guardians(ref self: ContractState, max_guardian_number: u8) {
+            self.max_guardians.write(max_guardian_number);
+        }
+
+        fn get_plan_beneficiaries_count(self: @ContractState, plan_id: u256) -> u32 {
+            let count = self.plan_beneficiaries_count.read(plan_id);
+            count
+        }
+
+        fn get_plan_beneficiaries(
+            self: @ContractState, plan_id: u256, index: u32,
+        ) -> ContractAddress {
+            let beneficiary = self.plan_beneficiaries.read((plan_id, index));
+            beneficiary
+        }
+
+
+        fn is_beneficiary(self: @ContractState, plan_id: u256, address: ContractAddress) -> bool {
+            self.is_beneficiary.read((plan_id, address))
+        }
+
+        fn set_plan_transfer_date(ref self: ContractState, plan_id: u256, date: u64) {
+            self.plan_transfer_date.write(plan_id, date);
+        }
+
+        fn get_activity_history(
+            self: @ContractState, user: ContractAddress, start_index: u256, page_size: u256,
+        ) -> Array<ActivityRecord> {
+            assert(page_size > 0, 'Page size must be positive');
+            let total_activity_count = self.user_activities_pointer.entry(user).read();
+
+            let mut activity_history = ArrayTrait::new();
+
+            let end_index = if start_index + page_size > total_activity_count {
+                total_activity_count
+            } else {
+                start_index + page_size
             };
 
-            // Store the new message at the next index
-            self.media_messages.write((plan_id, current_count), new_message);
+            // Iterate and collect activity records
+            let mut current_index = start_index + 1;
+            loop {
+                if current_index > end_index {
+                    break;
+                }
 
-            // Increment the message count for the plan
-            self.media_message_count.write(plan_id, current_count + 1);
+                let record = self.user_activities.entry(user).entry(current_index).read();
+                activity_history.append(record);
+
+                current_index += 1;
+            }
+
+            activity_history
+        }
+
+        fn get_activity_history_length(self: @ContractState, user: ContractAddress) -> u256 {
+            self.user_activities_pointer.entry(user).read()
+        }
+
+        fn get_total_plans(self: @ContractState) -> u256 {
+            self.total_plans.read()
         }
     }
 }
