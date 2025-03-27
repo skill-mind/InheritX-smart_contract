@@ -417,7 +417,7 @@ pub mod InheritX {
                 activity_history.append(record);
 
                 current_index += 1;
-            }
+            };
 
             activity_history
         }
