@@ -3,11 +3,11 @@ pub mod InheritxPlan {
     use core::array::ArrayTrait;
     use core::option::OptionTrait;
     use core::traits::TryInto;
-    use starknet::ContractAddress;
     use starknet::storage::{
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
         StoragePointerWriteAccess,
     };
+    use starknet::{ContractAddress, get_caller_address};
     use crate::interfaces::IInheritXPlan::IInheritXPlan;
     // Import the types from the interface
     use crate::interfaces::IInheritXPlan::{
@@ -288,11 +288,28 @@ pub mod InheritxPlan {
         fn can_override_plan(self: @ContractState, plan_id: u256) -> bool {
             // TODO: Implement can_override_plan
             // 1. Assert plan_id exists (plan_id < self.plans_count.read())
+            assert(plan_id < self.plans_count.read(), 'Plan does not exist');
+
             // 2. Check if plan is not already executed
+            if self.plan_transfer_date.read(plan_id) != 0 {
+                return false; // Plan is already executed and cannot be overridden
+            }
             // 3. Check if caller is the asset owner
+            let caller = get_caller_address();
+            let asset_owner = self.plan_asset_owner.read(plan_id);
+            if caller != asset_owner {
+                return false; // Caller is not the plan owner
+            }
             // 4. Check if plan is not locked (special conditions preventing override)
+            let creation_date = self.plan_creation_date.read(plan_id);
+            let current_time = starknet::get_block_timestamp();
+            let lock_period: u64 = 86400; // 24 hours in seconds
+
+            if current_time < creation_date + lock_period {
+                return false; // Plan is still in lock period
+            }
             // 5. Return true if all conditions are met, false otherwise
-            panic!("Not implemented")
+            true
         }
 
         fn can_delete_plan(self: @ContractState, plan_id: u256) -> bool {

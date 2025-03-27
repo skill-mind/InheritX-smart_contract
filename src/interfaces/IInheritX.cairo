@@ -50,11 +50,10 @@ pub trait IInheritX<TContractState> {
     fn get_user_activity(
         ref self: TContractState, user: ContractAddress, activity_id: u256,
     ) -> ActivityRecord;
-
     fn retrieve_claim(ref self: TContractState, inheritance_id: u256) -> SimpleBeneficiary;
     fn transfer_funds(ref self: TContractState, beneficiary: ContractAddress, amount: u256);
     fn test_deployment(ref self: TContractState) -> bool;
-
+    fn can_override_plan(self: @TContractState, plan_id: u256) -> bool;
     fn get_activity_history(
         self: @TContractState, user: ContractAddress, start_index: u256, page_size: u256,
     ) -> Array<ActivityRecord>;
