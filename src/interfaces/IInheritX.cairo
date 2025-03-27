@@ -69,6 +69,6 @@ pub trait IInheritX<TContractState> {
         profile_image: felt252,
     ) -> bool;
     fn get_profile(ref self: TContractState, address: ContractAddress) -> UserProfile;
-    fn verify_code(ref self: TContractState, user: ContractAddress, code: felt252) -> bool;    
+    fn verify_code(ref self: TContractState, user: ContractAddress, code: felt252) -> bool;
     fn is_verified(self: @TContractState, user: ContractAddress) -> bool;
 }

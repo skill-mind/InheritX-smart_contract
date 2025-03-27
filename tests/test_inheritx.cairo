@@ -1,6 +1,6 @@
 use inheritx::interfaces::IInheritX::{IInheritXDispatcher, IInheritXDispatcherTrait};
 use inheritx::types::ActivityType;
-use snforge_std::{ContractClassTrait, DeclareResultTrait, declare,store,map_entry_address};
+use snforge_std::{ContractClassTrait, DeclareResultTrait, declare, store, map_entry_address};
 use starknet::contract_address_const;
 
 fn setup() -> IInheritXDispatcher {
@@ -90,7 +90,7 @@ fn test_verify_code() {
     store(
         inheritX.contract_address,
         map_entry_address(selector!("expected_code"), array![user.into()].span()),
-        array![code].span()
+        array![code].span(),
     );
 
     // Call verify_code with the correct code

@@ -44,7 +44,7 @@ pub mod InheritX {
         balances: Map<ContractAddress, u256>,
         deployed: bool,
         user_profiles: Map<ContractAddress, UserProfile>,
-        expected_code: Map<ContractAddress, felt252>, 
+        expected_code: Map<ContractAddress, felt252>,
         verification_status: Map<ContractAddress, bool>,
     }
 
@@ -320,7 +320,7 @@ pub mod InheritX {
         fn get_total_plans(self: @ContractState) -> u256 {
             self.total_plans.read()
         }
-        
+
         fn verify_code(ref self: ContractState, user: ContractAddress, code: felt252) -> bool {
             let stored_code = self.expected_code.read(user);
             let is_valid = stored_code == code;
