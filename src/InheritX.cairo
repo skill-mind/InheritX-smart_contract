@@ -328,26 +328,21 @@ pub mod InheritX {
             self.deployed.read()
         }
 
-                /// Adds a media message to a specific plan.
+        /// Adds a media message to a specific plan.
         /// @param self - The contract state.
         /// @param plan_id - The ID of the plan.
         /// @param media_type - The type of media (e.g., 0 for image, 1 for video).
         /// @param media_content - The content of the media (e.g., IPFS hash or URL as felt252).
         #[external]
         fn add_media_message(
-            ref self: ContractState,
-            plan_id: u256,
-            media_type: felt252,
-            media_content: felt252,
+            ref self: ContractState, plan_id: u256, media_type: felt252, media_content: felt252,
         ) {
             // Get the current count of media messages for the plan
             let current_count = self.media_message_count.read(plan_id);
 
             // Create a new media message
             let new_message = MediaMessage {
-                plan_id: plan_id,
-                media_type: media_type,
-                media_content: media_content,
+                plan_id: plan_id, media_type: media_type, media_content: media_content,
             };
 
             // Store the new message at the next index
@@ -382,7 +377,7 @@ pub mod InheritX {
                 activity_history.append(record);
 
                 current_index += 1;
-            };
+            }
 
             activity_history
         }

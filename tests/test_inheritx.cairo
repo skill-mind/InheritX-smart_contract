@@ -84,8 +84,8 @@ fn test_add_media_message() {
 
     // Setup test parameters
     let plan_id = 1_u256;
-    let media_type = 0_felt252;  // Example: 0 for image
-    let media_content = 123456_felt252;  // Example: IPFS hash or URL as felt252
+    let media_type = 0_felt252; // Example: 0 for image
+    let media_content = 123456_felt252; // Example: IPFS hash or URL as felt252
 
     // Add a media message to a plan
     inheritX.add_media_message(plan_id, media_type, media_content);
