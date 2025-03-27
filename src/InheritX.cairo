@@ -8,7 +8,10 @@ pub mod InheritX {
     };
     use starknet::{ContractAddress, get_caller_address, get_contract_address, get_block_timestamp};
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
-    use crate::types::{SimpleBeneficiary, ActivityType, ActivityRecord};
+    use crate::types::{
+        SimpleBeneficiary, ActivityType, ActivityRecord, UserProfile, VerificationStatus, UserRole,
+        SecuritySettings, NotificationSettings,
+    };
 
 
     #[storage]
@@ -34,18 +37,6 @@ pub mod InheritX {
         claimed_plans: u256,
         total_value_locked: u256,
         total_fees_collected: u256,
-        // Plan details
-        plan_asset_owner: Map<u256, ContractAddress>, // plan_id -> asset_owner
-        plan_creation_date: Map<u256, u64>, // plan_id -> creation_date
-        plan_transfer_date: Map<u256, u64>, // plan_id -> transfer_date
-        plan_message: Map<u256, felt252>, // plan_id -> message
-        plan_total_value: Map<u256, u256>, // plan_id -> total_value
-        // Beneficiaries
-        plan_beneficiaries_count: Map<u256, u32>, // plan_id -> beneficiaries_count
-        plan_beneficiaries: Map<(u256, u32), ContractAddress>, // (plan_id, index) -> beneficiary
-        is_beneficiary: Map<
-            (u256, ContractAddress), bool,
-        >, // (plan_id, beneficiary) -> is_beneficiary
         // Record user activities
         user_activities: Map<ContractAddress, Map<u256, ActivityRecord>>,
         user_activities_pointer: Map<ContractAddress, u256>,
@@ -60,22 +51,13 @@ pub mod InheritX {
         verification_status: Map<ContractAddress, bool>,
         verification_attempts: Map<ContractAddress, u8>,
         verification_expiry: Map<ContractAddress, u64>,
+        user_profiles: Map<ContractAddress, UserProfile>,
     }
 
     #[event]
     #[derive(Drop, starknet::Event)]
-    enum Event {
-        BeneficiaryAdded: BeneficiaryAdded,
+    pub enum Event {
         ActivityRecordEvent: ActivityRecordEvent,
-    }
-
-    #[derive(Drop, starknet::Event)]
-    struct BeneficiaryAdded {
-        plan_id: u256,
-        beneficiary_id: u32,
-        address: ContractAddress,
-        name: felt252,
-        email: felt252,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -83,6 +65,13 @@ pub mod InheritX {
         user: ContractAddress,
         activity_id: u256,
     }
+    //     #[derive(Copy, Drop, Serde)]
+    //  enum VerificationStatus {
+    //     Unverified,
+    //     PendingVerification,
+    //     Verified,
+    //     Rejected,
+    // }
 
     #[constructor]
     fn constructor(ref self: ContractState) { // Initialize contract state:
@@ -96,6 +85,7 @@ pub mod InheritX {
         // 3. Initialize all statistics to 0
         // 4. Set is_paused to false
         self.deployed.write(true);
+        self.total_plans.write(0); // Initialize total_plans to 0
     }
 
     #[abi(embed_v0)]
@@ -142,12 +132,56 @@ pub mod InheritX {
 
             self.plans_id.write(inheritance_id + 1);
 
+            // Increment the total plans count
+            let total_plans = self.total_plans.read();
+            self.total_plans.write(total_plans + 1);
+
             // Transfer funds as part of the claim process
             self.transfer_funds(get_contract_address(), amount);
 
             // Return success code
             inheritance_id
         }
+        /// Creates a new user profile and stores it in the contract state.
+        ///
+        /// @param self - Reference to the contract state.
+        /// @param username - The user's chosen username.
+        /// @param email - The user's email address.
+        /// @param full_name - The user's full name.
+        /// @param profile_image - A reference to the user's profile image.
+        /// @return bool - Returns `true` if the profile is created successfully.
+        fn create_profile(
+            ref self: ContractState,
+            username: felt252,
+            email: felt252,
+            full_name: felt252,
+            profile_image: felt252,
+        ) -> bool {
+            // Create a new UserProfile with the provided values and defaults.
+            // We assume `self.contract_address` returns the caller's or contract's address.
+            // For connected_wallets, notification_settings, and security_settings, we assume
+            // there are default constructors or values available.
+            let new_profile = UserProfile {
+                address: get_caller_address(),
+                username: username,
+                email: email,
+                full_name: full_name,
+                profile_image: profile_image,
+                verification_status: VerificationStatus::Unverified,
+                role: UserRole::User,
+                notification_settings: NotificationSettings::Default,
+                security_settings: SecuritySettings::Two_factor_enabled,
+                created_at: get_block_timestamp(),
+                last_active: get_block_timestamp(),
+            };
+
+            // Store the new profile in the contract state's user_profiles mapping.
+            // Here we assume `user_profiles` is a mapping from an address to UserProfile.
+            self.user_profiles.write(new_profile.address, new_profile);
+
+            true
+        }
+
         /// Allows a beneficiary to collect their claim.
         /// @param self - The contract state.
         /// @param inheritance_id - The ID of the inheritance claim.
@@ -180,91 +214,11 @@ pub mod InheritX {
 
             // Update the claim in storage after modifying it
             self.funds.write(inheritance_id, claim);
+
             // Return success status
             true
         }
 
-        fn add_beneficiary(
-            ref self: ContractState,
-            plan_id: u256,
-            name: felt252,
-            email: felt252,
-            address: ContractAddress,
-        ) -> felt252 {
-            // 1. Check if plan exists by verifying asset owner
-            let asset_owner = self.plan_asset_owner.read(plan_id);
-            assert(asset_owner != address, 'Invalid plan_id');
-
-            // 2. Verify caller is asset owner
-            let caller = starknet::get_caller_address();
-            assert(caller == asset_owner, 'Caller is not the asset owner');
-
-            // 3. Check plan state
-            assert(self.plan_transfer_date.read(plan_id) == 0, 'Plan is already executed');
-
-            // 4. Validate beneficiary address
-            assert(!address.is_zero(), 'Invalid beneficiary address');
-            assert(!self.is_beneficiary.read((plan_id, address)), 'Adlready a beneficiary');
-
-            // 5. Validate input data
-            assert(name != 0, 'Name cannot be empty');
-            assert(email != 0, 'Email cannot be empty');
-
-            // 6. Get and validate beneficiary count
-            let current_count: u32 = self.plan_beneficiaries_count.read(plan_id);
-            let max_allowed: u32 = self.max_guardians.read().into();
-            assert(current_count < max_allowed, 'Exceeds max beneficiaries');
-
-            // 7. Update state
-            self.plan_beneficiaries.write((plan_id, current_count), address);
-            self.is_beneficiary.write((plan_id, address), true);
-            self.plan_beneficiaries_count.write(plan_id, current_count + 1);
-
-            self
-                .emit(
-                    Event::BeneficiaryAdded(
-                        BeneficiaryAdded {
-                            plan_id, beneficiary_id: current_count, address, name, email,
-                        },
-                    ),
-                );
-
-            // 8. Return the new beneficiary ID
-            current_count.into()
-        }
-
-        fn set_plan_asset_owner(ref self: ContractState, plan_id: u256, owner: ContractAddress) {
-            self.plan_asset_owner.write(plan_id, owner);
-        }
-
-        fn set_max_guardians(ref self: ContractState, max_guardian_number: u8) {
-            self.max_guardians.write(max_guardian_number);
-        }
-
-        fn get_plan_beneficiaries_count(self: @ContractState, plan_id: u256) -> u32 {
-            let count = self.plan_beneficiaries_count.read(plan_id);
-            count
-        }
-
-        fn get_plan_beneficiaries(
-            self: @ContractState, plan_id: u256, index: u32,
-        ) -> ContractAddress {
-            let beneficiary = self.plan_beneficiaries.read((plan_id, index));
-            beneficiary
-        }
-
-        fn get_total_plans(self: @ContractState) -> u256 {
-            let total_plans = self.total_plans.read();
-            total_plans
-        }
-
-        fn is_beneficiary(self: @ContractState, plan_id: u256, address: ContractAddress) -> bool {
-            self.is_beneficiary.read((plan_id, address))
-        }
-
-        fn set_plan_transfer_date(ref self: ContractState, plan_id: u256, date: u64) {
-            self.plan_transfer_date.write(plan_id, date);
-        }
         /// Records the activity of a user in the system
         /// @param self - The contract state.
         /// @param user - The user to record for.
@@ -283,7 +237,7 @@ pub mod InheritX {
         ) -> u256 {
             // fetch the user activities map
             let user_activities = self.user_activities.entry(user);
-            // get the user's current activity map pointer (tracking the map index)
+            // get the user's curuser_profilesrent activity map pointer (tracking the map index)
             let current_pointer = self.user_activities_pointer.entry(user).read();
             // create a record from the given details
             let record = ActivityRecord {
@@ -310,6 +264,11 @@ pub mod InheritX {
             ref self: ContractState, user: ContractAddress, activity_id: u256,
         ) -> ActivityRecord {
             self.user_activities.entry(user).entry(activity_id).read()
+        }
+
+        fn get_profile(ref self: ContractState, address: ContractAddress) -> UserProfile {
+            let user = self.user_profiles.read(address);
+            user
         }
 
 
@@ -381,6 +340,43 @@ pub mod InheritX {
         /// Check verification status
         fn is_verified(self: @ContractState, user: ContractAddress) -> bool {
             self.verification_status.read(user)
+
+        fn get_activity_history(
+            self: @ContractState, user: ContractAddress, start_index: u256, page_size: u256,
+        ) -> Array<ActivityRecord> {
+            assert(page_size > 0, 'Page size must be positive');
+            let total_activity_count = self.user_activities_pointer.entry(user).read();
+
+            let mut activity_history = ArrayTrait::new();
+
+            let end_index = if start_index + page_size > total_activity_count {
+                total_activity_count
+            } else {
+                start_index + page_size
+            };
+
+            // Iterate and collect activity records
+            let mut current_index = start_index + 1;
+            loop {
+                if current_index > end_index {
+                    break;
+                }
+
+                let record = self.user_activities.entry(user).entry(current_index).read();
+                activity_history.append(record);
+
+                current_index += 1;
+            };
+
+            activity_history
+        }
+
+        fn get_activity_history_length(self: @ContractState, user: ContractAddress) -> u256 {
+            self.user_activities_pointer.entry(user).read()
+        }
+
+        fn get_total_plans(self: @ContractState) -> u256 {
+            self.total_plans.read()
         }
     }
 }
