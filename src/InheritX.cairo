@@ -209,35 +209,6 @@ pub mod InheritX {
         fn test_deployment(ref self: ContractState) -> bool {
             self.deployed.read()
         }
-        
-                /// Adds a media message to a specific plan.
-        /// @param self - The contract state.
-        /// @param plan_id - The ID of the plan.
-        /// @param media_type - The type of media (e.g., 0 for image, 1 for video).
-        /// @param media_content - The content of the media (e.g., IPFS hash or URL as felt252).
-        #[external]
-        fn add_media_message(
-            ref self: ContractState,
-            plan_id: u256,
-            media_type: felt252,
-            media_content: felt252,
-        ) {
-            // Get the current count of media messages for the plan
-            let current_count = self.media_message_count.read(plan_id);
-
-            // Create a new media message
-            let new_message = MediaMessage {
-                plan_id: plan_id,
-                media_type: media_type,
-                media_content: media_content,
-            };
-
-            // Store the new message at the next index
-            self.media_messages.write((plan_id, current_count), new_message);
-
-            // Increment the message count for the plan
-            self.media_message_count.write(plan_id, current_count + 1);
-        }
 
         fn add_beneficiary(
             ref self: ContractState,
@@ -315,6 +286,44 @@ pub mod InheritX {
 
         fn set_plan_transfer_date(ref self: ContractState, plan_id: u256, date: u64) {
             self.plan_transfer_date.write(plan_id, date);
+        }
+
+        fn get_activity_history(
+            self: @ContractState, user: ContractAddress, start_index: u256, page_size: u256,
+        ) -> Array<ActivityRecord> {
+            assert(page_size > 0, 'Page size must be positive');
+            let total_activity_count = self.user_activities_pointer.entry(user).read();
+
+            let mut activity_history = ArrayTrait::new();
+
+            let end_index = if start_index + page_size > total_activity_count {
+                total_activity_count
+            } else {
+                start_index + page_size
+            };
+
+            // Iterate and collect activity records
+            let mut current_index = start_index + 1;
+            loop {
+                if current_index > end_index {
+                    break;
+                }
+
+                let record = self.user_activities.entry(user).entry(current_index).read();
+                activity_history.append(record);
+
+                current_index += 1;
+            };
+
+            activity_history
+        }
+
+        fn get_activity_history_length(self: @ContractState, user: ContractAddress) -> u256 {
+            self.user_activities_pointer.entry(user).read()
+        }
+
+        fn get_total_plans(self: @ContractState) -> u256 {
+            self.total_plans.read()
         }
     }
 }
