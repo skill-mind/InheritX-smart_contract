@@ -1,14 +1,14 @@
 #[starknet::contract]
 pub mod InheritX {
     use starknet::storage::{
-        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
-        StoragePathEntry, StoragePointerWriteAccess,
+        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePathEntry,
+        StoragePointerReadAccess, StoragePointerWriteAccess,
     };
-    use starknet::{ContractAddress, get_caller_address, get_contract_address, get_block_timestamp};
+    use starknet::{ContractAddress, get_block_timestamp, get_caller_address, get_contract_address};
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
     use crate::types::{
-        SimpleBeneficiary, ActivityType, ActivityRecord, UserProfile, VerificationStatus, UserRole,
-        SecuritySettings, NotificationSettings,
+        ActivityRecord, ActivityType, NotificationSettings, SecuritySettings, SimpleBeneficiary,
+        UserProfile, UserRole, VerificationStatus,
     };
 
     #[storage]
@@ -353,7 +353,7 @@ pub mod InheritX {
                 activity_history.append(record);
 
                 current_index += 1;
-            };
+            }
 
             activity_history
         }
