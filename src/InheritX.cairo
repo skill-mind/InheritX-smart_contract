@@ -55,6 +55,8 @@ pub mod InheritX {
         plan_names: Map<u256, felt252>,
         plan_descriptions: Map<u256, felt252>,
         user_profiles: Map<ContractAddress, UserProfile>,
+        expected_code: Map<ContractAddress, felt252>,
+        verification_status: Map<ContractAddress, bool>,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -428,6 +430,20 @@ pub mod InheritX {
 
         fn get_total_plans(self: @ContractState) -> u256 {
             self.total_plans.read()
+        }
+
+        fn verify_code(ref self: ContractState, user: ContractAddress, code: felt252) -> bool {
+            let stored_code = self.expected_code.read(user);
+            let is_valid = stored_code == code;
+
+            if is_valid {
+                self.verification_status.write(user, true);
+            }
+            is_valid
+        }
+
+        fn is_verified(self: @ContractState, user: ContractAddress) -> bool {
+            self.verification_status.read(user)
         }
     }
 }

@@ -2,7 +2,9 @@ use inheritx::interfaces::IInheritX::{
     AssetAllocation, IInheritX, IInheritXDispatcher, IInheritXDispatcherTrait,
 };
 use inheritx::types::ActivityType;
-use snforge_std::{CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_caller_address, declare};
+use inheritx::types::ActivityType;
+use snforge_std::{ContractClassTrait, DeclareResultTrait, declare};
+use starknet::contract_address_const;
 use starknet::ContractAddress;
 use starknet::class_hash::ClassHash;
 use starknet::contract_address::contract_address_const;
@@ -155,4 +157,53 @@ fn test_get_activity_history_invalid_page_size() {
 
     // Should panic with zero page size
     inheritX.get_activity_history(user, 0, 0);
+}
+
+#[test]
+fn test_verify_code() {
+    let inheritX = setup();
+    let user = contract_address_const::<'user'>();
+    let code: felt252 = 12345;
+
+    // Initially, the user should not be verified
+    let is_verified = inheritX.is_verified(user);
+    assert(is_verified == false, 'User not be verified initially');
+
+    // Simulate setting the expected code using store cheatcode
+    store(
+        inheritX.contract_address,
+        map_entry_address(selector!("expected_code"), array![user.into()].span()),
+        array![code].span(),
+    );
+
+    // Call verify_code with the correct code
+    let verification_result = inheritX.verify_code(user, code);
+    assert(verification_result == true, 'Ver should succeed correct code');
+
+    // User should now be verified
+    let is_verified = inheritX.is_verified(user);
+    assert(is_verified == true, 'User should now be verified');
+}
+
+#[test]
+fn test_verify_code_incorrect_code() {
+    let inheritX = setup();
+    let user = contract_address_const::<'user'>();
+    let correct_code: felt252 = 12345;
+    let incorrect_code: felt252 = 54321;
+
+    // Initially, the user should not be verified
+    let is_verified = inheritX.is_verified(user);
+    assert(is_verified == false, 'User not be verified initially');
+
+    // Cheat: Set the expected code for the user
+    // inheritX.expected_code.write(user, correct_code);
+
+    // Call verify_code with the incorrect code
+    let verification_result = inheritX.verify_code(user, incorrect_code);
+    assert(verification_result == false, 'Verification fail incorrect');
+
+    // User should still not be verified
+    let is_verified = inheritX.is_verified(user);
+    assert(is_verified == false, 'User still not be verified');
 }
