@@ -4,11 +4,9 @@ on:
   push:
     branches:
       - main
-      - feature/create-plan
   pull_request:
     branches:
       - main
-      - feature/create-plan
 
 jobs:
   check:
