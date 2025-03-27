@@ -1,5 +1,5 @@
 use starknet::ContractAddress;
-use crate::types::{SimpleBeneficiary, ActivityType, ActivityRecord, UserProfile};
+use crate::types::{ActivityRecord, ActivityType, SimpleBeneficiary, UserProfile};
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct InheritancePlan {
@@ -16,6 +16,13 @@ pub struct AssetAllocation {
     pub token: ContractAddress,
     pub amount: u256,
     pub percentage: u8,
+}
+
+#[derive(Copy, Drop, Serde)]
+pub struct MediaMessage {
+    pub plan_id: felt252,
+    pub media_type: felt252,
+    pub media_content: felt252,
 }
 
 #[starknet::interface]
@@ -71,4 +78,17 @@ pub trait IInheritX<TContractState> {
     fn get_profile(ref self: TContractState, address: ContractAddress) -> UserProfile;
     fn verify_code(ref self: TContractState, user: ContractAddress, code: felt252) -> bool;
     fn is_verified(self: @TContractState, user: ContractAddress) -> bool;
+    fn add_beneficiary(
+        ref self: TContractState,
+        plan_id: u256,
+        name: felt252,
+        email: felt252,
+        address: ContractAddress,
+    ) -> felt252;
+    fn is_beneficiary(self: @TContractState, plan_id: u256, address: ContractAddress) -> bool;
+    fn get_plan_beneficiaries(self: @TContractState, plan_id: u256, index: u32) -> ContractAddress;
+    fn get_plan_beneficiaries_count(self: @TContractState, plan_id: u256) -> u32;
+    fn set_max_guardians(ref self: TContractState, max_guardian_number: u8);
+    fn set_plan_transfer_date(ref self: TContractState, plan_id: u256, date: u64);
+    fn set_plan_asset_owner(ref self: TContractState, plan_id: u256, owner: ContractAddress);
 }

@@ -3,6 +3,7 @@ use inheritx::types::ActivityType;
 use snforge_std::{ContractClassTrait, DeclareResultTrait, declare, store, map_entry_address};
 use starknet::contract_address_const;
 
+
 fn setup() -> IInheritXDispatcher {
     let contract_class = declare("InheritX").unwrap().contract_class();
     let mut calldata = array![];
