@@ -1,15 +1,14 @@
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use starknet::{ContractAddress, contract_address_const};
-    use inheritx::interfaces::IInheritX::{IInheritXDispatcher, IInheritXDispatcherTrait};
     use inheritx::InheritX::InheritX;
-    use snforge_std::{
-        declare, DeclareResultTrait, ContractClassTrait, stop_cheat_caller_address,
-        start_cheat_caller_address,
-    };
     use inheritx::interfaces::IInheritX::{IInheritXDispatcher, IInheritXDispatcherTrait};
-  use inheritx::types::ActivityType;
+    use inheritx::types::ActivityType;
+    use snforge_std::{
+        ContractClassTrait, DeclareResultTrait, declare, start_cheat_caller_address,
+        stop_cheat_caller_address,
+    };
+    use starknet::{ContractAddress, contract_address_const};
+    use super::*;
 
     // Sets up the environment for testing
     fn setup() -> (IInheritXDispatcher, ContractAddress) {
@@ -21,7 +20,6 @@ mod tests {
         let dispatcher = IInheritXDispatcher { contract_address };
 
         (dispatcher, contract_address)
-  
     }
 
 
@@ -87,81 +85,70 @@ mod tests {
         assert(verification_status_after == true, 'should not be unverified');
     }
 
-use inheritx::interfaces::IInheritX::{IInheritXDispatcher, IInheritXDispatcherTrait};
-use inheritx::types::ActivityType;
-use snforge_std::{ContractClassTrait, DeclareResultTrait, declare};
-use starknet::contract_address_const;
 
+    #[test]
+    fn test_get_activity_history_empty() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
 
-fn setup() -> IInheritXDispatcher {
-    let contract_class = declare("InheritX").unwrap().contract_class();
-    let mut calldata = array![];
-    let (contract_address, _) = contract_class.deploy(@calldata).unwrap();
-    IInheritXDispatcher { contract_address }
-}
+        // Check initial activity history length
+        let history_length = dispatcher.get_activity_history_length(user);
+        assert(history_length == 0, 'Initial history should be empty');
 
-#[test]
-fn test_get_activity_history_empty() {
-    let inheritX = setup();
-    let user = contract_address_const::<'user'>();
+        // Try to retrieve history
+        let history = dispatcher.get_activity_history(user, 0, 10);
+        assert(history.len() == 0, 'History should be empty');
+    }
 
-    // Check initial activity history length
-    let history_length = inheritX.get_activity_history_length(user);
-    assert(history_length == 0, 'Initial history should be empty');
+    #[test]
+    fn test_get_activity_history_pagination() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
 
-    // Try to retrieve history
-    let history = inheritX.get_activity_history(user, 0, 10);
-    assert(history.len() == 0, 'History should be empty');
-}
+        // Record multiple activities
+        let _activity1_id = dispatcher
+            .record_user_activity(
+                user, ActivityType::Login, 'First login', '192.168.1.1', 'Desktop Chrome',
+            );
 
-#[test]
-fn test_get_activity_history_pagination() {
-    let inheritX = setup();
-    let user = contract_address_const::<'user'>();
+        let _activity2_id = dispatcher
+            .record_user_activity(
+                user,
+                ActivityType::ProfileUpdate,
+                'Profile details updated',
+                '192.168.1.2',
+                'Mobile Safari',
+            );
 
-    // Record multiple activities
-    let _activity1_id = inheritX
-        .record_user_activity(
-            user, ActivityType::Login, 'First login', '192.168.1.1', 'Desktop Chrome',
-        );
+        let _activity3_id = dispatcher
+            .record_user_activity(
+                user,
+                ActivityType::WalletConnection,
+                'Wallet connected',
+                '192.168.1.3',
+                'Mobile Android',
+            );
 
-    let _activity2_id = inheritX
-        .record_user_activity(
-            user,
-            ActivityType::ProfileUpdate,
-            'Profile details updated',
-            '192.168.1.2',
-            'Mobile Safari',
-        );
+        // Check total history length
+        let history_length = dispatcher.get_activity_history_length(user);
+        assert(history_length == 3, 'Incorrect history length');
 
-    let _activity3_id = inheritX
-        .record_user_activity(
-            user,
-            ActivityType::WalletConnection,
-            'Wallet connected',
-            '192.168.1.3',
-            'Mobile Android',
-        );
+        // Test first page (2 records)
+        let first_page = dispatcher.get_activity_history(user, 0, 2);
+        assert(first_page.len() == 2, 'should have 2 records');
 
-    // Check total history length
-    let history_length = inheritX.get_activity_history_length(user);
-    assert(history_length == 3, 'Incorrect history length');
+        // Test second page (1 record)
+        let second_page = dispatcher.get_activity_history(user, 2, 2);
+        assert(second_page.len() == 1, 'should have 1 record');
+    }
 
-    // Test first page (2 records)
-    let first_page = inheritX.get_activity_history(user, 0, 2);
-    assert(first_page.len() == 2, 'should have 2 records');
+    #[test]
+    #[should_panic(expected: ('Page size must be positive',))]
+    fn test_get_activity_history_invalid_page_size() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
 
-    // Test second page (1 record)
-    let second_page = inheritX.get_activity_history(user, 2, 2);
-    assert(second_page.len() == 1, 'should have 1 record');
-}
-
-#[test]
-#[should_panic(expected: ('Page size must be positive',))]
-fn test_get_activity_history_invalid_page_size() {
-    let inheritX = setup();
-    let user = contract_address_const::<'user'>();
-
-    // Should panic with zero page size
-    inheritX.get_activity_history(user, 0, 0);
+        // Should panic with zero page size
+        dispatcher.get_activity_history(user, 0, 0);
+    }
 }

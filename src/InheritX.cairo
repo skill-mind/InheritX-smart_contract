@@ -2,7 +2,6 @@
 pub mod InheritX {
     use core::num::traits::Zero;
     use core::traits::Into;
-
     use starknet::storage::{
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePathEntry,
         StoragePointerReadAccess, StoragePointerWriteAccess,
@@ -247,8 +246,7 @@ pub mod InheritX {
 
             // check expiry
             let check_expiry = self.check_expiry(user);
-            assert_eq!(check_expiry, true);
-
+            assert(check_expiry == true, 'Check expiry failed');
             // verify code
             self.get_verification_status(code, user);
         }
@@ -270,40 +268,13 @@ pub mod InheritX {
         /// Check verification status
         fn is_verified(self: @ContractState, user: ContractAddress) -> bool {
             self.verification_status.read(user)
+        }
 
-        fn get_activity_history(
-            self: @ContractState, user: ContractAddress, start_index: u256, page_size: u256,
-        ) -> Array<ActivityRecord> {
-            assert(page_size > 0, 'Page size must be positive');
-            let total_activity_count = self.user_activities_pointer.entry(user).read();
-
-            let mut activity_history = ArrayTrait::new();
-
-            let end_index = if start_index + page_size > total_activity_count {
-                total_activity_count
-            } else {
-                start_index + page_size
-            };
-
-            // Iterate and collect activity records
-            let mut current_index = start_index + 1;
-            loop {
-                if current_index > end_index {
-                    break;
-                }
-
-                let record = self.user_activities.entry(user).entry(current_index).read();
-                activity_history.append(record);
-
-                current_index += 1;
-        
-                /// Adds a media message to a specific plan.
+        /// Adds a media message to a specific plan.
         /// @param self - The contract state.
         /// @param plan_id - The ID of the plan.
         /// @param media_type - The type of media (e.g., 0 for image, 1 for video).
         /// @param media_content - The content of the media (e.g., IPFS hash or URL as felt252).
-        #[external]
-        fn add_media_message(
         fn add_beneficiary(
             ref self: ContractState,
             plan_id: u256,
