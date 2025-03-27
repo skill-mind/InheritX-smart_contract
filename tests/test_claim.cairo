@@ -1,6 +1,4 @@
 // Import the contract modules
-use inheritx::imple::InheritXClaim::InheritxClaim;
-use inheritx::imple::InheritXPlan::InheritxPlan;
 use inheritx::interfaces::IInheritX::{IInheritX, IInheritXDispatcher, IInheritXDispatcherTrait};
 use snforge_std::{CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_caller_address, declare};
 use starknet::ContractAddress;
@@ -193,4 +191,36 @@ fn test_collect_claim_twice() {
     assert(success, 'Claim unsuccessful');
 
     let success2 = dispatcher.collect_claim(0, beneficiary, 2563);
+}
+
+
+#[test]
+fn test_collect_create_profile() {
+    let contract_address = setup();
+    let dispatcher = IInheritXDispatcher { contract_address };
+    let caller: ContractAddress = contract_address_const::<'benefactor'>();
+
+    // Test input values
+    let username: felt252 = 'John1234';
+    let email: felt252 = 'John@yahoo.com';
+    let fullname = 'John Doe';
+    let image = 'image';
+
+    // Ensure the caller is the admin
+    cheat_caller_address(contract_address, caller, CheatSpan::Indefinite);
+
+    // Call create_claim
+    let claim_id = dispatcher.create_profile(username, email, fullname, image);
+
+    // Validate that the claim ID is correctly incremented
+
+    cheat_caller_address(contract_address, caller, CheatSpan::Indefinite);
+
+    let new_profile = dispatcher.get_profile(caller);
+
+    assert(new_profile.username == username, 'Wrong Username');
+    assert(new_profile.email == email, ' Wrong email');
+    assert(new_profile.full_name == fullname, ' Wrong fullname');
+    assert(new_profile.profile_image == image, ' Wrong image');
+    assert(new_profile.address == caller, ' Wrong Owner');
 }
