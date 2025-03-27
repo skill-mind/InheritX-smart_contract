@@ -9,7 +9,7 @@ pub mod InheritX {
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
     use crate::types::{
         ActivityRecord, ActivityType, NotificationSettings, SecuritySettings, SimpleBeneficiary,
-        UserProfile, UserRole, VerificationStatus,
+        UserProfile, UserRole, VerificationStatus
     };
 
     #[storage]
@@ -39,6 +39,8 @@ pub mod InheritX {
         plan_total_value: Map<u256, u256>,
         plan_beneficiaries_count: Map<u256, u32>,
         plan_beneficiaries: Map<(u256, u32), ContractAddress>,
+        plan_inactivity_period: Map<u256, u64>,
+        plan_multi_signature_required: Map<u256, bool>,
         is_beneficiary: Map<(u256, ContractAddress), bool>,
         user_activities: Map<ContractAddress, Map<u256, ActivityRecord>>,
         user_activities_pointer: Map<ContractAddress, u256>,
@@ -428,6 +430,41 @@ pub mod InheritX {
 
         fn get_total_plans(self: @ContractState) -> u256 {
             self.total_plans.read()
+        }
+
+        fn can_execute_plan(self: @ContractState, plan_id: u256) -> bool {
+            // Check if id is valid
+            let valid_id = plan_id < self.total_plans.read();
+            assert(valid_id, 'Invalid plan ID');
+
+            // Check if plan is in Active status
+            let status_requirement = self.inheritance_plans.entry(plan_id).is_active == true;
+            assert(status_requirement, 'Plan is not active');
+
+            // Check if transfer date is reached
+            let time_requirement: bool = self.plan_transfer_date.entry(plan_id).read() <= get_block_timestamp();
+            assert(time_requirement, 'Transfer date not reached');
+
+            // Check if inactivity period is met by asset owner
+            let inactivity_period_requirement: bool = {
+                let inactivity_period = self.plan_transfer_date.entry(plan_id).read();
+                let last_active = self.plan_creation_date.entry(plan_id).read();
+                self.plan_inactivity_period.entry(plan_id).read() <= (get_block_timestamp() - last_active)
+            };
+            assert(inactivity_period_requirement, 'Inactivity period not met');
+
+            // Check if multi_signature_required is true
+            if self.plan_multi_signature_required.entry(plan_id).read() {
+                // Check if required approvals are met
+                let current_approvals = self.plan_guardian_count.entry(plan_id).read();
+                assert(current_approvals >= required_approvals, 'Not enough approvals');
+            }
+            
+            if (valid_id && status_requirement && time_requirement && inactivity_period_requirement) {
+                return true;
+            } else {
+                return false;
+            }
         }
     }
 }
