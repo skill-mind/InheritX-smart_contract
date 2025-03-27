@@ -8,12 +8,12 @@ pub mod InheritxPlan {
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
         StoragePointerWriteAccess,
     };
-    use crate::interfaces::IInheritXPlan::IInheritXPlan;
     // Import the types from the interface
     use crate::interfaces::IInheritXPlan::{
         BeneficiaryAllocation, MediaMessage, NFTAllocation, PlanConditions, PlanOverview,
         PlanSection, PlanStatus, SimpleBeneficiary, TokenAllocation, TokenInfo,
     };
+    use crate::interfaces::IInheritXPlan::IInheritXPlan;
 
     #[derive(Copy, Drop, Serde, starknet::Store)]
     pub struct NFTInfo {

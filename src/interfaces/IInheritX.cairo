@@ -1,5 +1,5 @@
 use starknet::ContractAddress;
-use crate::types::{SimpleBeneficiary, ActivityType, ActivityRecord, UserProfile};
+use crate::types::{ActivityRecord, ActivityType, SimpleBeneficiary, UserProfile};
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct InheritancePlan {
@@ -20,9 +20,9 @@ pub struct AssetAllocation {
 
 #[derive(Copy, Drop, Serde)]
 pub struct MediaMessage {
-    pub plan_id: felt252,       
-    pub media_type: felt252,    
-    pub media_content: felt252  
+    pub plan_id: felt252,
+    pub media_type: felt252,
+    pub media_content: felt252,
 }
 
 #[starknet::interface]
@@ -59,6 +59,9 @@ pub trait IInheritX<TContractState> {
     ) -> ActivityRecord;
 
     fn retrieve_claim(ref self: TContractState, inheritance_id: u256) -> SimpleBeneficiary;
+    fn get_beneficiary_by_address(
+        self: @TContractState, beneficiary_address: ContractAddress,
+    ) -> SimpleBeneficiary;
     fn transfer_funds(ref self: TContractState, beneficiary: ContractAddress, amount: u256);
     fn test_deployment(ref self: TContractState) -> bool;
 

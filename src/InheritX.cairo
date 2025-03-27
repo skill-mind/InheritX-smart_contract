@@ -1,14 +1,14 @@
 #[starknet::contract]
 pub mod InheritX {
     use starknet::storage::{
-        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
-        StoragePathEntry, StoragePointerWriteAccess,
+        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePathEntry,
+        StoragePointerReadAccess, StoragePointerWriteAccess,
     };
-    use starknet::{ContractAddress, get_caller_address, get_contract_address, get_block_timestamp};
+    use starknet::{ContractAddress, get_block_timestamp, get_caller_address, get_contract_address};
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
     use crate::types::{
-        SimpleBeneficiary, ActivityType, ActivityRecord, UserProfile, VerificationStatus, UserRole,
-        SecuritySettings, NotificationSettings,
+        ActivityRecord, ActivityType, NotificationSettings, SecuritySettings, SimpleBeneficiary,
+        UserProfile, UserRole, VerificationStatus,
     };
 
     #[storage]
@@ -273,6 +273,53 @@ pub mod InheritX {
             self.funds.read(inheritance_id)
         }
 
+        /// Retrieves a beneficiary by their wallet address.
+        /// @param self - The contract state.
+        /// @param beneficiary_address - The wallet address of the beneficiary to find.
+        /// @returns The `SimpleBeneficiary` struct if found, or a default SimpleBeneficiary if not
+        /// found.
+        /// @dev This function iterates through all plans to find a beneficiary with the specified
+        /// address.
+        ///      If no matching beneficiary is found, it returns a default SimpleBeneficiary with
+        ///      all fields zeroed.
+        fn get_beneficiary_by_address(
+            self: @ContractState, beneficiary_address: ContractAddress,
+        ) -> SimpleBeneficiary {
+            // Get the total number of plans
+            let total_plans = self.plans_id.read();
+
+            // Initialize a variable to store the found beneficiary
+            let mut current_id: u256 = 0;
+
+            // Iterate through all plans to find a matching beneficiary
+            while current_id != total_plans {
+                let beneficiary = self.funds.read(current_id);
+
+                // Check if the wallet address matches
+                if beneficiary.wallet_address == beneficiary_address {
+                    return beneficiary;
+                }
+
+                // Move to the next plan
+                current_id = current_id + 1;
+            }
+
+            // Return a default SimpleBeneficiary if no matching beneficiary is found
+            let zero_address: ContractAddress = 0.try_into().unwrap();
+
+            SimpleBeneficiary {
+                id: 0,
+                name: 0,
+                email: 0,
+                wallet_address: zero_address,
+                personal_message: 0,
+                amount: 0,
+                code: 0,
+                claim_status: false,
+                benefactor: zero_address,
+            }
+        }
+
         fn transfer_funds(ref self: ContractState, beneficiary: ContractAddress, amount: u256) {
             let current_bal = self.balances.read(beneficiary);
             self.balances.write(beneficiary, current_bal + amount);
@@ -280,27 +327,22 @@ pub mod InheritX {
         fn test_deployment(ref self: ContractState) -> bool {
             self.deployed.read()
         }
-        
-                /// Adds a media message to a specific plan.
+
+        /// Adds a media message to a specific plan.
         /// @param self - The contract state.
         /// @param plan_id - The ID of the plan.
         /// @param media_type - The type of media (e.g., 0 for image, 1 for video).
         /// @param media_content - The content of the media (e.g., IPFS hash or URL as felt252).
         #[external]
         fn add_media_message(
-            ref self: ContractState,
-            plan_id: u256,
-            media_type: felt252,
-            media_content: felt252,
+            ref self: ContractState, plan_id: u256, media_type: felt252, media_content: felt252,
         ) {
             // Get the current count of media messages for the plan
             let current_count = self.media_message_count.read(plan_id);
 
             // Create a new media message
             let new_message = MediaMessage {
-                plan_id: plan_id,
-                media_type: media_type,
-                media_content: media_content,
+                plan_id: plan_id, media_type: media_type, media_content: media_content,
             };
 
             // Store the new message at the next index
@@ -308,6 +350,44 @@ pub mod InheritX {
 
             // Increment the message count for the plan
             self.media_message_count.write(plan_id, current_count + 1);
+        }
+
+        fn get_activity_history(
+            self: @ContractState, user: ContractAddress, start_index: u256, page_size: u256,
+        ) -> Array<ActivityRecord> {
+            assert(page_size > 0, 'Page size must be positive');
+            let total_activity_count = self.user_activities_pointer.entry(user).read();
+
+            let mut activity_history = ArrayTrait::new();
+
+            let end_index = if start_index + page_size > total_activity_count {
+                total_activity_count
+            } else {
+                start_index + page_size
+            };
+
+            // Iterate and collect activity records
+            let mut current_index = start_index + 1;
+            loop {
+                if current_index > end_index {
+                    break;
+                }
+
+                let record = self.user_activities.entry(user).entry(current_index).read();
+                activity_history.append(record);
+
+                current_index += 1;
+            }
+
+            activity_history
+        }
+
+        fn get_activity_history_length(self: @ContractState, user: ContractAddress) -> u256 {
+            self.user_activities_pointer.entry(user).read()
+        }
+
+        fn get_total_plans(self: @ContractState) -> u256 {
+            self.total_plans.read()
         }
     }
 }

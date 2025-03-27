@@ -3,7 +3,7 @@ use inheritx::types::ActivityType;
 use snforge_std::{ContractClassTrait, DeclareResultTrait, declare};
 use starknet::contract_address_const;
 
-
+/// Setup function to deploy the contract and return the dispatcher.
 fn setup() -> IInheritXDispatcher {
     let contract_class = declare("InheritX").unwrap().contract_class();
     let mut calldata = array![];
@@ -77,14 +77,15 @@ fn test_get_activity_history_invalid_page_size() {
     inheritX.get_activity_history(user, 0, 0);
 }
 
+
 #[test]
 fn test_add_media_message() {
     let inheritX = setup();
 
     // Setup test parameters
     let plan_id = 1_u256;
-    let media_type = 0_felt252;  // Example: 0 for image
-    let media_content = 123456_felt252;  // Example: IPFS hash or URL as felt252
+    let media_type = 0_felt252; // Example: 0 for image
+    let media_content = 123456_felt252; // Example: IPFS hash or URL as felt252
 
     // Add a media message to a plan
     inheritX.add_media_message(plan_id, media_type, media_content);
@@ -97,4 +98,46 @@ fn test_add_media_message() {
     assert(stored_message.plan_id == plan_id, 'Plan ID mismatch');
     assert(stored_message.media_type == media_type, 'Media type mismatch');
     assert(stored_message.media_content == media_content, 'Media content mismatch');
+}
+
+
+#[test]
+fn test_get_beneficiary_by_address() {
+    let inheritX = setup();
+    let beneficiary_address = contract_address_const::<'beneficiary'>();
+    let non_existent_address = contract_address_const::<'non_existent'>();
+
+    // Create a claim to add a beneficiary
+    let name = 'John Doe';
+    let email = 'john@example.com';
+    let personal_message = 'Take care of yourself';
+    let amount = 1000_u256;
+    let claim_code = 12345_u256;
+
+    // Record the claim and get the ID
+    let inheritance_id = inheritX
+        .create_claim(name, email, beneficiary_address, personal_message, amount, claim_code);
+
+    // Test retrieving the beneficiary by address
+    let found_beneficiary = inheritX.get_beneficiary_by_address(beneficiary_address);
+
+    // Verify all fields match what we created
+    assert(found_beneficiary.id == inheritance_id, 'Wrong beneficiary ID');
+    assert(found_beneficiary.name == name, 'Wrong beneficiary name');
+    assert(found_beneficiary.email == email, 'Wrong beneficiary email');
+    assert(found_beneficiary.wallet_address == beneficiary_address, 'Wrong wallet address');
+    assert(found_beneficiary.personal_message == personal_message, 'Wrong personal message');
+    assert(found_beneficiary.amount == amount, 'Wrong amount');
+    assert(found_beneficiary.code == claim_code, 'Wrong claim code');
+    assert(found_beneficiary.claim_status == false, 'Wrong claim status');
+
+    // Test with a non-existent address
+    let not_found_beneficiary = inheritX.get_beneficiary_by_address(non_existent_address);
+
+    // Verify a default zero beneficiary is returned
+    assert(not_found_beneficiary.id == 0, 'Should have zero ID');
+    assert(not_found_beneficiary.name == 0, 'Should have zero name');
+    assert(not_found_beneficiary.email == 0, 'Should have zero email');
+    assert(not_found_beneficiary.amount == 0, 'Should have zero amount');
+    assert(not_found_beneficiary.claim_status == false, 'Should be unclaimed');
 }
