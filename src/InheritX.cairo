@@ -43,44 +43,35 @@ pub mod InheritX {
         deployed: bool,
 
         user_profiles: Map<ContractAddress, UserProfile>,
-        plan_asset_owner: Map<u256, ContractAddress>, // plan_id -> asset_owner
-        plan_creation_date: Map<u256, u64>, // plan_id -> creation_date
-        plan_transfer_date: Map<u256, u64>, // plan_id -> transfer_date
         plan_message: Map<u256, felt252>, // plan_id -> message
-        plan_total_value: Map<u256, u256>, // plan_id -> total_value
         // Beneficiaries
         plan_beneficiaries_count: Map<u256, u32>, // plan_id -> beneficiaries_count
         plan_beneficiaries: Map<(u256, u32), ContractAddress>, // (plan_id, index) -> beneficiary
-        is_beneficiary: Map<(u256, ContractAddress), bool>,
   
+        // Plan management
+        plans_count: u256,
+        // Beneficiaries
+        is_beneficiary: Map<(u256, ContractAddress), bool>, // (plan_id, beneficiary) -> is_beneficiary
+        beneficiary_details: Map<(u256, ContractAddress), SimpleBeneficiary>, // (plan_id, beneficiary) -> beneficiary details
 
-  
-            // Plan management
-            plans_count: u256,
-            // Beneficiaries
-            plan_beneficiaries_count: Map<u256, u32>, // plan_id -> beneficiaries_count
-            plan_beneficiaries: Map<(u256, u32), ContractAddress>, // (plan_id, index) -> beneficiary address
-            is_beneficiary: Map<(u256, ContractAddress), bool>, // (plan_id, beneficiary) -> is_beneficiary
-            beneficiary_details: Map<(u256, ContractAddress), SimpleBeneficiary>, // (plan_id, beneficiary) -> beneficiary details
-    
-            // Plan details
-            plan_asset_owner: Map<u256, ContractAddress>, // plan_id -> asset_owner
-            plan_name: Map<u256, felt252>, // plan_id -> name
-            plan_description: Map<u256, felt252>, // plan_id -> description
-            plan_creation_date: Map<u256, u64>, // plan_id -> creation_date
-            plan_transfer_date: Map<u256, u64>, // plan_id -> transfer_date
-            plan_total_value: Map<u256, u256>, // plan_id -> total_value
-            plan_status: Map<u256, PlanStatus>, // plan_id -> status
-            plan_conditions: Map<u256, PlanConditions>, // plan_id -> conditions
-    
-            // Tokens
-            plan_tokens_count: Map<u256, u32>, // plan_id -> tokens_count
-            plan_tokens: Map<(u256, u32), TokenInfo>, // (plan_id, index) -> token_info
-            token_allocations: Map<(u256, ContractAddress, ContractAddress), TokenAllocation>, // (plan_id, beneficiary, token) -> allocation
-    
-            // Media messages
-            plan_media_messages_count: Map<u256, u32>, // plan_id -> media_messages_count
-            plan_media_messages: Map<(u256, u32), MediaMessage>, // (plan_id, index) -> media_message
+        // Plan details
+        plan_asset_owner: Map<u256, ContractAddress>, // plan_id -> asset_owner
+        plan_name: Map<u256, felt252>, // plan_id -> name
+        plan_description: Map<u256, felt252>, // plan_id -> description
+        plan_creation_date: Map<u256, u64>, // plan_id -> creation_date
+        plan_transfer_date: Map<u256, u64>, // plan_id -> transfer_date
+        plan_total_value: Map<u256, u256>, // plan_id -> total_value
+        plan_status: Map<u256, PlanStatus>, // plan_id -> status
+        plan_conditions: Map<u256, PlanConditions>, // plan_id -> conditions
+
+        // Tokens
+        plan_tokens_count: Map<u256, u32>, // plan_id -> tokens_count
+        plan_tokens: Map<(u256, u32), TokenInfo>, // (plan_id, index) -> token_info
+        token_allocations: Map<(u256, ContractAddress, ContractAddress), TokenAllocation>, // (plan_id, beneficiary, token) -> allocation
+
+        // Media messages
+        plan_media_messages_count: Map<u256, u32>, // plan_id -> media_messages_count
+        plan_media_messages: Map<(u256, u32), MediaMessage>, // (plan_id, index) -> media_message
     
  
 
