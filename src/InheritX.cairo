@@ -11,6 +11,15 @@ pub mod InheritX {
         SecuritySettings, NotificationSettings,
     };
 
+       // New Wallet struct to manage user wallets
+    #[derive(Drop, Serde, starknet::Store)]
+    struct Wallet {
+        address: ContractAddress,
+        is_primary: bool,
+        wallet_type: felt252, // e.g., 'personal', 'inheritance', 'business'
+        added_at: u64
+    }
+
     #[storage]
     struct Storage {
         // Contract addresses for component management
@@ -44,6 +53,10 @@ pub mod InheritX {
         balances: Map<ContractAddress, u256>,
         deployed: bool,
         user_profiles: Map<ContractAddress, UserProfile>,
+          // New wallet-related storage mappings
+        user_wallets: Map<ContractAddress, Array<Wallet>>,
+        user_primary_wallet: Map<ContractAddress, ContractAddress>,
+        total_user_wallets: Map<ContractAddress, u256>
     }
 
     #[event]
@@ -308,6 +321,116 @@ pub mod InheritX {
 
             // Increment the message count for the plan
             self.media_message_count.write(plan_id, current_count + 1);
+        }
+
+           /// Add a new wallet for a user
+        /// @param wallet - The wallet address to add
+        /// @param wallet_type - Type of wallet (e.g., 'personal', 'inheritance')
+        /// @return bool - Indicates if wallet was successfully added
+        fn add_wallet(
+            ref self: ContractState, 
+            wallet: ContractAddress, 
+            wallet_type: felt252
+        ) -> bool {
+            // Validate input
+            assert!(wallet != starknet::contract_address_const::<0>(), 'Invalid wallet address');
+            
+            // Get the caller (user)
+            let user = get_caller_address();
+
+            // Retrieve existing wallets
+            let mut wallets = self.user_wallets.read(user);
+            
+            // Check if wallet already exists
+            let wallet_exists = wallets.iter().any(|w| w.address == wallet);
+            assert!(!wallet_exists, 'Wallet already exists');
+
+            // Create new wallet
+            let new_wallet = Wallet {
+                address: wallet,
+                is_primary: wallets.is_empty(), // First wallet becomes primary
+                wallet_type: wallet_type,
+                added_at: get_block_timestamp()
+            };
+
+            // Add wallet to user's wallets
+            wallets.append(new_wallet);
+
+            // Update storage
+            self.user_wallets.write(user, wallets);
+
+            // Update primary wallet if this is the first wallet
+            if wallets.len() == 1 {
+                self.user_primary_wallet.write(user, wallet);
+            }
+
+            // Update total wallets count
+            let total_wallets = self.total_user_wallets.read(user);
+            self.total_user_wallets.write(user, total_wallets + 1);
+
+            true
+        }
+
+        /// Set a specific wallet as the primary wallet for a user
+        /// @param wallet - The wallet address to set as primary
+        /// @return bool - Indicates if wallet was successfully set as primary
+        fn set_primary_wallet(
+            ref self: ContractState, 
+            wallet: ContractAddress
+        ) -> bool {
+            // Get the caller (user)
+            let user = get_caller_address();
+
+            // Retrieve existing wallets
+            let mut wallets = self.user_wallets.read(user);
+            
+            // Find the wallet index
+            let mut wallet_found = false;
+            let mut wallet_index = 0;
+            for (index, existing_wallet) in wallets.iter().enumerate() {
+                if existing_wallet.address == wallet {
+                    wallet_found = true;
+                    wallet_index = index;
+                    break;
+                }
+            }
+
+            // Ensure wallet exists
+            assert!(wallet_found, 'Wallet not found');
+
+            // Reset primary status for all wallets
+            for mut w in wallets.iter_mut() {
+                w.is_primary = false;
+            }
+
+            // Set the specified wallet as primary
+            wallets[wallet_index].is_primary = true;
+
+            // Update storage
+            self.user_wallets.write(user, wallets);
+            self.user_primary_wallet.write(user, wallet);
+
+            true
+        }
+
+        /// Get the primary wallet for a user
+        /// @param user - The user address
+        /// @return ContractAddress - The primary wallet address
+        fn get_primary_wallet(
+            self: @ContractState, 
+            user: ContractAddress
+        ) -> ContractAddress {
+            self.user_primary_wallet.read(user)
+        }
+
+        /// Get all wallets for a user
+        /// @param user - The user address
+        /// @return Array<Wallet> - Array of user's wallets
+        fn get_user_wallets(
+            self: @ContractState, 
+            user: ContractAddress
+        ) -> Array<Wallet> {
+            self.user_wallets.read(user)
         }
     }
 }
