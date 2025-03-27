@@ -20,6 +20,13 @@ pub struct AssetAllocation {
     pub percentage: u8,
 }
 
+#[derive(Copy, Drop, Serde)]
+pub struct MediaMessage {
+    pub plan_id: felt252,       
+    pub media_type: felt252,    
+    pub media_content: felt252  
+}
+
 #[starknet::interface]
 pub trait IInheritX<TContractState> {
     // Initialize a new claim with a claim code
@@ -47,13 +54,8 @@ pub trait IInheritX<TContractState> {
         description: felt252,
         pick_beneficiaries: Array<ContractAddress>,
     ) -> u256;
-
-    fn retrieve_claim(ref self: TContractState, inheritance_id: u256) -> SimpleBeneficiary;
-    fn transfer_funds(ref self: TContractState, beneficiary: ContractAddress, amount: u256);
-    fn test_deployment(ref self: TContractState) -> bool;
     // Getters
     fn get_inheritance_plan(ref self: TContractState, plan_id: u256) -> InheritancePlan;
-    fn get_total_plans(self: @TContractState) -> u256;
     fn add_beneficiary(
         ref self: TContractState,
         plan_id: u256,
@@ -80,6 +82,16 @@ pub trait IInheritX<TContractState> {
         ref self: TContractState, user: ContractAddress, activity_id: u256,
     ) -> ActivityRecord;
 
+    fn retrieve_claim(ref self: TContractState, inheritance_id: u256) -> SimpleBeneficiary;
+    fn transfer_funds(ref self: TContractState, beneficiary: ContractAddress, amount: u256);
+    fn test_deployment(ref self: TContractState) -> bool;
+
+    fn get_activity_history(
+        self: @TContractState, user: ContractAddress, start_index: u256, page_size: u256,
+    ) -> Array<ActivityRecord>;
+
+    fn get_activity_history_length(self: @TContractState, user: ContractAddress) -> u256;
+    fn get_total_plans(self: @TContractState) -> u256;
     fn create_profile(
         ref self: TContractState,
         username: felt252,
