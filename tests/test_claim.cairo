@@ -138,7 +138,6 @@ fn test_collect_claim_with_wrong_code() {
     let dispatcher = IInheritXDispatcher { contract_address };
     let benefactor: ContractAddress = contract_address_const::<'benefactor'>();
     let beneficiary: ContractAddress = contract_address_const::<'beneficiary'>();
-    let malicious: ContractAddress = contract_address_const::<'malicious'>();
 
     // Test input values
     let name: felt252 = 'John';
@@ -225,4 +224,68 @@ fn test_collect_create_profile() {
     assert(new_profile.full_name == fullname, ' Wrong fullname');
     assert(new_profile.profile_image == image, ' Wrong image');
     assert(new_profile.address == caller, ' Wrong Owner');
+}
+
+#[test]
+fn test_delete_profile() {
+    let contract_address = setup();
+    let dispatcher = IInheritXDispatcher { contract_address };
+    let caller: ContractAddress = contract_address_const::<'benefactor'>();
+
+    // Test input values
+    let username: felt252 = 'John1234';
+    let email: felt252 = 'John@yahoo.com';
+    let fullname = 'John Doe';
+    let image = 'image';
+
+    // Ensure the caller is the admin
+    cheat_caller_address(contract_address, caller, CheatSpan::Indefinite);
+
+    // Call create_claim
+    let claim_id = dispatcher.create_profile(username, email, fullname, image);
+
+    // Validate that the claim ID is correctly incremented
+
+    cheat_caller_address(contract_address, caller, CheatSpan::Indefinite);
+    let success = dispatcher.delete_user_profile(caller);
+    assert(success, 'Deletion Failed');
+    let new_profile = dispatcher.get_profile(caller);
+
+    assert(new_profile.username == ' ', 'Wrong Username');
+    assert(new_profile.email == ' ', ' Wrong email');
+    assert(new_profile.full_name == ' ', ' Wrong fullname');
+    assert(new_profile.profile_image == ' ', ' Wrong image');
+}
+
+#[test]
+#[should_panic(expected: 'No right to delete')]
+fn test_non_authorized_delete_profile() {
+    let contract_address = setup();
+    let dispatcher = IInheritXDispatcher { contract_address };
+    let caller: ContractAddress = contract_address_const::<'benefactor'>();
+    let malicious: ContractAddress = contract_address_const::<'malicious'>();
+
+    // Test input values
+    let username: felt252 = 'John1234';
+    let email: felt252 = 'John@yahoo.com';
+    let fullname = 'John Doe';
+    let image = 'image';
+
+    // Ensure the caller is the admin
+    cheat_caller_address(contract_address, caller, CheatSpan::Indefinite);
+
+    // Call create_claim
+    let claim_id = dispatcher.create_profile(username, email, fullname, image);
+
+    // Validate that the claim ID is correctly incremented
+
+    cheat_caller_address(contract_address, malicious, CheatSpan::Indefinite);
+    let success = dispatcher.delete_user_profile(caller);
+    assert(success, 'Deletion Failed');
+    let new_profile = dispatcher.get_profile(caller);
+
+    assert(new_profile.username == ' ', 'Wrong Username');
+    assert(new_profile.email == ' ', ' Wrong email');
+    assert(new_profile.full_name == ' ', ' Wrong fullname');
+    assert(new_profile.profile_image == ' ', ' Wrong image');
 }
