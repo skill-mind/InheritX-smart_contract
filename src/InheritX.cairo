@@ -331,7 +331,6 @@ pub mod InheritX {
             is_valid
         }
 
-        // Consulta el estado
         fn is_verified(self: @ContractState, user: ContractAddress) -> bool {
             self.verification_status.read(user)
         }
