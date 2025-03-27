@@ -14,7 +14,6 @@ pub mod InheritX {
 
     #[storage]
     struct Storage {
-        // Contract addresses for component management
         admin: ContractAddress,
         security_contract: ContractAddress,
         plan_contract: ContractAddress,
@@ -22,38 +21,40 @@ pub mod InheritX {
         profile_contract: ContractAddress,
         dashboard_contract: ContractAddress,
         swap_contract: ContractAddress,
-        // Protocol configuration parameters
-        protocol_fee: u256, // Base points (1 = 0.01%)
-        min_guardians: u8, // Minimum guardians per plan
-        max_guardians: u8, // Maximum guardians per plan
-        min_timelock: u64, // Minimum timelock period in seconds
-        max_timelock: u64, // Maximum timelock period in seconds
-        is_paused: bool, // Protocol pause state
-        // Protocol statistics for analytics
-        total_plans: u256,
-        active_plans: u256,
-        claimed_plans: u256,
-        total_value_locked: u256,
-        total_fees_collected: u256,
-        // Record user activities
+        pub protocol_fee: u256,
+        pub min_guardians: u8,
+        pub max_guardians: u8,
+        pub min_timelock: u64,
+        pub max_timelock: u64,
+        pub is_paused: bool,
+        pub total_plans: u256,
+        pub active_plans: u256,
+        pub claimed_plans: u256,
+        pub total_value_locked: u256,
+        pub total_fees_collected: u256,
+        plan_asset_owner: Map<u256, ContractAddress>,
+        plan_creation_date: Map<u256, u64>,
+        plan_transfer_date: Map<u256, u64>,
+        plan_message: Map<u256, felt252>,
+        plan_total_value: Map<u256, u256>,
+        plan_beneficiaries_count: Map<u256, u32>,
+        plan_beneficiaries: Map<(u256, u32), ContractAddress>,
+        is_beneficiary: Map<(u256, ContractAddress), bool>,
         user_activities: Map<ContractAddress, Map<u256, ActivityRecord>>,
         user_activities_pointer: Map<ContractAddress, u256>,
-        // Beneficiary to Recipient Mapping
-        funds: Map<u256, SimpleBeneficiary>,
-        plans_id: u256,
-        // Dummy Mapping For transfer
+        pub funds: Map<u256, SimpleBeneficiary>,
+        pub plans_id: u256,
         balances: Map<ContractAddress, u256>,
         deployed: bool,
+        inheritance_plans: Map<u256, InheritancePlan>,
+        plan_guardians: Map<(u256, u8), ContractAddress>,
+        plan_assets: Map<(u256, u8), AssetAllocation>,
+        plan_guardian_count: Map<u256, u8>,
+        plan_asset_count: Map<u256, u8>,
+        // storage mappings for plan_name and description
+        plan_names: Map<u256, felt252>,
+        plan_descriptions: Map<u256, felt252>,
         user_profiles: Map<ContractAddress, UserProfile>,
-        plan_asset_owner: Map<u256, ContractAddress>, // plan_id -> asset_owner
-        plan_creation_date: Map<u256, u64>, // plan_id -> creation_date
-        plan_transfer_date: Map<u256, u64>, // plan_id -> transfer_date
-        plan_message: Map<u256, felt252>, // plan_id -> message
-        plan_total_value: Map<u256, u256>, // plan_id -> total_value
-        // Beneficiaries
-        plan_beneficiaries_count: Map<u256, u32>, // plan_id -> beneficiaries_count
-        plan_beneficiaries: Map<(u256, u32), ContractAddress>, // (plan_id, index) -> beneficiary
-        is_beneficiary: Map<(u256, ContractAddress), bool>,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -86,13 +87,113 @@ pub mod InheritX {
     // }
 
     #[constructor]
-    fn constructor(ref self: ContractState) { // Initialize contract state:
+    fn constructor(ref self: ContractState) {
+        self.admin.write(get_caller_address());
+        self.protocol_fee.write(50);
+        self.min_guardians.write(1);
+        self.max_guardians.write(5);
+        self.min_timelock.write(604800);
+        self.max_timelock.write(31536000);
+        self.total_plans.write(0);
+        self.active_plans.write(0);
+        self.claimed_plans.write(0);
+        self.total_value_locked.write(0);
+        self.total_fees_collected.write(0);
+        self.is_paused.write(false);
         self.deployed.write(true);
         self.total_plans.write(0); // Initialize total_plans to 0
     }
 
     #[abi(embed_v0)]
-    impl IInheritXImpl of IInheritX<ContractState> { // Contract Management Functions
+    impl IInheritXImpl of IInheritX<ContractState> {
+        fn create_inheritance_plan(
+            ref self: ContractState,
+            plan_name: felt252,
+            tokens: Array<AssetAllocation>,
+            description: felt252,
+            pick_beneficiaries: Array<ContractAddress>,
+        ) -> u256 {
+            // Validate inputs
+            let asset_count = tokens.len();
+            assert(asset_count > 0, 'No assets specified');
+
+            let beneficiary_count = pick_beneficiaries.len();
+            assert(beneficiary_count > 0, 'No beneficiaries specified');
+
+            // Calculate total value of tokens
+            let mut total_value: u256 = 0;
+            let mut i: u32 = 0;
+            while i < asset_count {
+                let asset = tokens.at(i);
+                total_value += *asset.amount;
+                i += 1;
+            };
+
+            // Generate new plan ID
+            let plan_id = self.plans_id.read();
+            self.plans_id.write(plan_id + 1);
+
+            // Store plan details
+            self.plan_names.write(plan_id, plan_name);
+            self.plan_descriptions.write(plan_id, description);
+            self.plan_asset_owner.write(plan_id, get_caller_address());
+            self.plan_creation_date.write(plan_id, get_block_timestamp());
+            self.plan_total_value.write(plan_id, total_value);
+
+            let new_plan = InheritancePlan {
+                owner: get_caller_address(),
+                // time_lock_period: 0,
+                // required_guardians: 0,
+                is_active: true,
+                is_claimed: false,
+                total_value,
+                plan_name,
+                description,
+            };
+            self.inheritance_plans.write(plan_id, new_plan);
+
+            // Store assets (tokens)
+            let mut asset_index: u8 = 0;
+            i = 0;
+            while i < asset_count {
+                self.plan_assets.write((plan_id, asset_index), *tokens.at(i));
+                asset_index += 1;
+                i += 1;
+            };
+            self.plan_asset_count.write(plan_id, asset_count.try_into().unwrap());
+
+            // Store beneficiaries
+            let mut beneficiary_index: u32 = 0;
+            i = 0;
+            while i < beneficiary_count {
+                let beneficiary = *pick_beneficiaries.at(i);
+                self.plan_beneficiaries.write((plan_id, beneficiary_index), beneficiary);
+                self.is_beneficiary.write((plan_id, beneficiary), true);
+                beneficiary_index += 1;
+                i += 1;
+            };
+            self.plan_beneficiaries_count.write(plan_id, beneficiary_count);
+
+            // Update protocol statistics
+            let current_total_plans = self.total_plans.read();
+            self.total_plans.write(current_total_plans + 1);
+            let current_active_plans = self.active_plans.read();
+            self.active_plans.write(current_active_plans + 1);
+            let current_tvl = self.total_value_locked.read();
+            self.total_value_locked.write(current_tvl + total_value);
+
+            // Transfer assets to contract
+            i = 0;
+            while i < asset_count {
+                let asset = tokens.at(i);
+                self.transfer_funds(get_contract_address(), *asset.amount);
+                i += 1;
+            };
+
+            // Return the plan ID
+            plan_id
+        }
+
         fn create_claim(
             ref self: ContractState,
             name: felt252,
@@ -102,8 +203,7 @@ pub mod InheritX {
             amount: u256,
             claim_code: u256,
         ) -> u256 {
-            let inheritance_id = self.plans_id.read(); // Use it before incrementing
-            // Create a new beneficiary record
+            let inheritance_id = self.plans_id.read();
             let new_beneficiary = SimpleBeneficiary {
                 id: inheritance_id,
                 name,
@@ -111,7 +211,7 @@ pub mod InheritX {
                 wallet_address: beneficiary,
                 personal_message,
                 amount,
-                code: claim_code, // Ensure type compatibility
+                code: claim_code,
                 claim_status: false,
                 benefactor: get_caller_address(),
             };
@@ -166,6 +266,9 @@ pub mod InheritX {
             self.funds.write(inheritance_id, claim);
             true
         }
+        fn get_inheritance_plan(ref self: ContractState, plan_id: u256) -> InheritancePlan {
+            self.inheritance_plans.read(plan_id)
+        }
 
         fn record_user_activity(
             ref self: ContractState,
@@ -206,6 +309,7 @@ pub mod InheritX {
             let current_bal = self.balances.read(beneficiary);
             self.balances.write(beneficiary, current_bal + amount);
         }
+
         fn test_deployment(ref self: ContractState) -> bool {
             self.deployed.read()
         }
