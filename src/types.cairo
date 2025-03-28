@@ -233,11 +233,11 @@ pub struct ActivityRecord {
     pub device_info: felt252,
 }
 
- #[derive(Drop, Serde, starknet::Store)]
+#[derive(Drop, Serde, starknet::Store)]
 pub struct Wallet {
     pub address: ContractAddress,
     pub is_primary: bool,
     pub wallet_type: felt252,
-    pub added_at: u64
+    pub added_at: u64,
 }
 

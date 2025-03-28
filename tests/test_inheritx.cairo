@@ -1,7 +1,7 @@
 use inheritx::interfaces::IInheritX::{
     AssetAllocation, IInheritX, IInheritXDispatcher, IInheritXDispatcherTrait,
 };
-use inheritx::types::{ActivityType, Wallet};  // Added Wallet to support wallet tests
+use inheritx::types::{ActivityType, Wallet}; // Added Wallet to support wallet tests
 use snforge_std::{CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_caller_address, declare};
 use starknet::ContractAddress;
 use starknet::class_hash::ClassHash;
@@ -158,8 +158,7 @@ fn test_get_activity_history_invalid_page_size() {
 }
 
 
- // Wallet Management tests
-
+// Wallet Management tests
 
 #[test]
 fn test_add_first_wallet() {
