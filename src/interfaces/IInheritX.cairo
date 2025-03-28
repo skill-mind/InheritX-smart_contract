@@ -69,6 +69,7 @@ pub trait IInheritX<TContractState> {
     fn set_max_guardians(ref self: TContractState, max_guardian_number: u8);
     fn set_plan_transfer_date(ref self: TContractState, plan_id: u256, date: u64);
     fn set_plan_asset_owner(ref self: TContractState, plan_id: u256, owner: ContractAddress);
+    fn can_execute_plan(self: @TContractState, plan_id: u256) -> bool;
     fn record_user_activity(
         ref self: TContractState,
         user: ContractAddress,
