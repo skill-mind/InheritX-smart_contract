@@ -1,21 +1,148 @@
-use inheritx::interfaces::IInheritX::{
-    AssetAllocation, IInheritX, IInheritXDispatcher, IInheritXDispatcherTrait,
-};
-use inheritx::types::{ActivityType, Wallet}; // Added Wallet to support wallet tests
-use snforge_std::{CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_caller_address, declare};
-use starknet::ContractAddress;
-use starknet::class_hash::ClassHash;
-use starknet::contract_address::contract_address_const;
-use starknet::testing::{set_caller_address, set_contract_address};
+#[cfg(test)]
+mod tests {
+    use inheritx::InheritX::InheritX;
+    use inheritx::interfaces::IInheritX::{
+        AssetAllocation, IInheritX, IInheritXDispatcher, IInheritXDispatcherTrait,
+    };
+    use inheritx::types::ActivityType;
+    use snforge_std::{
+        CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_block_timestamp,
+        cheat_caller_address, declare, start_cheat_caller_address, stop_cheat_caller_address,
+    };
+    use starknet::class_hash::ClassHash;
+    use starknet::testing::{set_caller_address, set_contract_address};
+    use starknet::{ContractAddress, contract_address_const};
+    use super::*;
+
+    // Sets up the environment for testing
+    fn setup() -> (IInheritXDispatcher, ContractAddress) {
+        // Declare and deploy the account contracts
+        let inheritX_class = declare("InheritX").unwrap().contract_class();
+
+        let (contract_address, _) = inheritX_class.deploy(@array![]).unwrap();
+
+        let dispatcher = IInheritXDispatcher { contract_address };
+
+        (dispatcher, contract_address)
+    }
+
+    #[test]
+    fn test_is_verified() {
+        let (IInheritXDispatcher, contract_address) = setup();
+        let caller = contract_address_const::<'address'>();
+        let dispatcher = IInheritXDispatcher { contract_address };
+        // Ensure dispatcher methods exist
+        let deployed = dispatcher.test_deployment();
+        start_cheat_caller_address(contract_address, caller);
+        let is_verified = dispatcher.is_verified(caller);
+        assert(is_verified == false, 'should be unverified');
+    }
+
+    #[test]
+    #[should_panic(expected: 'Code expired')]
+    fn test_is_expired() {
+        let (IInheritXDispatcher, contract_address) = setup();
+        let caller = contract_address_const::<'address'>();
+        let dispatcher = IInheritXDispatcher { contract_address };
+        // Ensure dispatcher methods exist
+        let deployed = dispatcher.test_deployment();
+        start_cheat_caller_address(contract_address, caller);
+        let is_expired = dispatcher.check_expiry(caller);
+        assert(is_expired == true, 'should not be expired');
+    }
+
+    #[test]
+    fn test_get_verification_status() {
+        let (IInheritXDispatcher, contract_address) = setup();
+        let caller = contract_address_const::<'address'>();
+        let dispatcher = IInheritXDispatcher { contract_address };
+        // Ensure dispatcher methods exist
+        start_cheat_caller_address(contract_address, caller);
+        let verification_status = dispatcher.get_verification_status(20, caller);
+        assert(verification_status == false, 'should be unverified');
+    }
+
+    #[test]
+    #[should_panic(expected: 'Code expired')]
+    fn test_complete_verification() {
+        let (IInheritXDispatcher, contract_address) = setup();
+        let caller = contract_address_const::<'address'>();
+        let dispatcher = IInheritXDispatcher { contract_address };
+        // Ensure dispatcher methods exist
+        start_cheat_caller_address(contract_address, caller);
+        let verification_status_before = dispatcher.get_verification_status(20, caller);
+        assert(verification_status_before == false, 'should be unverified');
+        let complete_verification = dispatcher.complete_verififcation(caller, 20);
+        let verification_status_after = dispatcher.get_verification_status(20, caller);
+        assert(verification_status_after == true, 'should not be unverified');
+    }
 
 
-fn setup() -> IInheritXDispatcher {
-    let contract_class = declare("InheritX").unwrap().contract_class();
-    let mut calldata = array![];
-    let (contract_address, _) = contract_class.deploy(@calldata).unwrap();
-    IInheritXDispatcher { contract_address }
-}
+    #[test]
+    fn test_get_activity_history_empty() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
 
+        // Check initial activity history length
+        let history_length = dispatcher.get_activity_history_length(user);
+        assert(history_length == 0, 'Initial history should be empty');
+
+        // Try to retrieve history
+        let history = dispatcher.get_activity_history(user, 0, 10);
+        assert(history.len() == 0, 'History should be empty');
+    }
+
+    #[test]
+    fn test_get_activity_history_pagination() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
+
+        // Record multiple activities
+        let _activity1_id = dispatcher
+            .record_user_activity(
+                user, ActivityType::Login, 'First login', '192.168.1.1', 'Desktop Chrome',
+            );
+
+        let _activity2_id = dispatcher
+            .record_user_activity(
+                user,
+                ActivityType::ProfileUpdate,
+                'Profile details updated',
+                '192.168.1.2',
+                'Mobile Safari',
+            );
+
+        let _activity3_id = dispatcher
+            .record_user_activity(
+                user,
+                ActivityType::WalletConnection,
+                'Wallet connected',
+                '192.168.1.3',
+                'Mobile Android',
+            );
+
+        // Check total history length
+        let history_length = dispatcher.get_activity_history_length(user);
+        assert(history_length == 3, 'Incorrect history length');
+
+        // Test first page (2 records)
+        let first_page = dispatcher.get_activity_history(user, 0, 2);
+        assert(first_page.len() == 2, 'should have 2 records');
+
+        // Test second page (1 record)
+        let second_page = dispatcher.get_activity_history(user, 2, 2);
+        assert(second_page.len() == 1, 'should have 1 record');
+    }
+
+    #[test]
+    #[should_panic(expected: ('Page size must be positive',))]
+    fn test_get_activity_history_invalid_page_size() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
+
+        // Should panic with zero page size
+        dispatcher.get_activity_history(user, 0, 0);
+    }
 
     #[test]
     fn test_initial_data() {
@@ -84,177 +211,146 @@ fn setup() -> IInheritXDispatcher {
         // Ensure the caller is the admin
         // cheat_caller_address(contract_address, benefactor, CheatSpan::Indefinite);
 
-    let assets: Array<AssetAllocation> = array![
-        AssetAllocation { token: benefactor, amount: 1000, percentage: 50 },
-        AssetAllocation { token: beneficiary, amount: 1000, percentage: 50 },
-    ];
-    inheritX.create_inheritance_plan(plan_name, assets, description, pick_beneficiaries);
-}
+        let assets: Array<AssetAllocation> = array![
+            AssetAllocation { token: benefactor, amount: 1000, percentage: 50 },
+            AssetAllocation { token: beneficiary, amount: 1000, percentage: 50 },
+        ];
+        dispatcher.create_inheritance_plan(plan_name, assets, description, pick_beneficiaries);
+    }
 
-#[test]
-fn test_get_activity_history_empty() {
-    let inheritX = setup();
-    let user = contract_address_const::<'user'>();
+    // New Wallet Management Tests
 
-    // Check initial activity history length
-    let history_length = inheritX.get_activity_history_length(user);
-    assert(history_length == 0, 'Initial history should be empty');
+    #[test]
+    fn test_add_first_wallet() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
+        let wallet_addr = contract_address_const::<'wallet1'>();
+        let wallet_type = 'personal';
 
-    // Try to retrieve history
-    let history = inheritX.get_activity_history(user, 0, 10);
-    assert(history.len() == 0, 'History should be empty');
-}
+        start_cheat_caller_address(contract_address, user);
+        cheat_block_timestamp(contract_address, 1000, CheatSpan::Indefinite);
 
-#[test]
-fn test_get_activity_history_pagination() {
-    let inheritX = setup();
-    let user = contract_address_const::<'user'>();
+        let success = dispatcher.add_wallet(wallet_addr, wallet_type);
+        assert(success, 'add_wallet failed');
 
-    // Record multiple activities
-    let _activity1_id = inheritX
-        .record_user_activity(
-            user, ActivityType::Login, 'First login', '192.168.1.1', 'Desktop Chrome',
-        );
+        let primary_wallet = dispatcher.get_primary_wallet(user);
+        assert(primary_wallet == wallet_addr, 'primary wallet mismatch');
 
-    let _activity2_id = inheritX
-        .record_user_activity(
-            user,
-            ActivityType::ProfileUpdate,
-            'Profile details updated',
-            '192.168.1.2',
-            'Mobile Safari',
-        );
+        let wallets = dispatcher.get_user_wallets(user);
+        assert(wallets.len() == 1, 'wallet count mismatch');
+        let wallet = wallets.at(0);
+        assert(*wallet.address == wallet_addr, 'address mismatch');
+        assert(*wallet.is_primary, 'should be primary');
+        assert(*wallet.wallet_type == wallet_type, 'type mismatch');
+        assert(*wallet.added_at > 0, 'added_at not set');
+    }
 
-    let _activity3_id = inheritX
-        .record_user_activity(
-            user,
-            ActivityType::WalletConnection,
-            'Wallet connected',
-            '192.168.1.3',
-            'Mobile Android',
-        );
+    #[test]
+    fn test_add_multiple_wallets() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
+        let wallet1 = contract_address_const::<'wallet1'>();
+        let wallet2 = contract_address_const::<'wallet2'>();
+        let wallet3 = contract_address_const::<'wallet3'>();
+        let wallet_type = 'personal';
 
-    // Check total history length
-    let history_length = inheritX.get_activity_history_length(user);
-    assert(history_length == 3, 'Incorrect history length');
+        start_cheat_caller_address(contract_address, user);
+        cheat_block_timestamp(contract_address, 1000, CheatSpan::Indefinite);
 
-    // Test first page (2 records)
-    let first_page = inheritX.get_activity_history(user, 0, 2);
-    assert(first_page.len() == 2, 'should have 2 records');
+        dispatcher.add_wallet(wallet1, wallet_type);
+        dispatcher.add_wallet(wallet2, wallet_type);
+        dispatcher.add_wallet(wallet3, wallet_type);
 
-    // Test second page (1 record)
-    let second_page = inheritX.get_activity_history(user, 2, 2);
-    assert(second_page.len() == 1, 'should have 1 record');
-}
+        let wallets = dispatcher.get_user_wallets(user);
+        assert(wallets.len() == 3, 'wallet count mismatch');
 
-#[test]
-#[should_panic(expected: ('Page size must be positive',))]
-fn test_get_activity_history_invalid_page_size() {
-    let inheritX = setup();
-    let user = contract_address_const::<'user'>();
+        let primary_wallet = dispatcher.get_primary_wallet(user);
+        assert(primary_wallet == wallet1, 'primary wallet mismatch');
+    }
 
-    // Should panic with zero page size
-    inheritX.get_activity_history(user, 0, 0);
-}
+    #[test]
+    fn test_set_primary_wallet() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
+        let wallet1 = contract_address_const::<'wallet1'>();
+        let wallet2 = contract_address_const::<'wallet2'>();
+        let wallet_type = 'personal';
 
+        start_cheat_caller_address(contract_address, user);
+        cheat_block_timestamp(contract_address, 1000, CheatSpan::Indefinite);
 
-// Wallet Management tests
+        dispatcher.add_wallet(wallet1, wallet_type);
+        dispatcher.add_wallet(wallet2, wallet_type);
 
-#[test]
-fn test_add_first_wallet() {
-    let inheritX = setup();
-    let user = contract_address_const::<'user'>();
-    let wallet_addr = contract_address_const::<'wallet1'>();
-    let wallet_type = 'personal';
-    cheat_caller_address(inheritX.contract_address, user, CheatSpan::Indefinite);
-    let success = inheritX.add_wallet(wallet_addr, wallet_type);
-    assert(success, 'err1');
-    let primary_wallet = inheritX.get_primary_wallet(user);
-    assert(primary_wallet == wallet_addr, 'err2');
-    let wallets = inheritX.get_user_wallets(user);
-    assert(wallets.len() == 1, 'err3');
-    let wallet = wallets.at(0);
-    assert(*wallet.address == wallet_addr, 'err4');
-    assert(*wallet.is_primary, 'err5');
-    assert(*wallet.wallet_type == wallet_type, 'err6');
-}
+        let success = dispatcher.set_primary_wallet(wallet2);
+        assert(success, 'set_primary failed');
 
-#[test]
-fn test_add_multiple_wallets() {
-    let inheritX = setup();
-    let user = contract_address_const::<'user'>();
-    let wallet1 = contract_address_const::<'wallet1'>();
-    let wallet2 = contract_address_const::<'wallet2'>();
-    let wallet3 = contract_address_const::<'wallet3'>();
-    let wallet_type = 'personal';
-    cheat_caller_address(inheritX.contract_address, user, CheatSpan::Indefinite);
-    inheritX.add_wallet(wallet1, wallet_type);
-    inheritX.add_wallet(wallet2, wallet_type);
-    inheritX.add_wallet(wallet3, wallet_type);
-    let wallets = inheritX.get_user_wallets(user);
-    assert(wallets.len() == 3, 'err1');
-    let primary_wallet = inheritX.get_primary_wallet(user);
-    assert(primary_wallet == wallet1, 'err2');
-}
+        let primary_wallet = dispatcher.get_primary_wallet(user);
+        assert(primary_wallet == wallet2, 'primary wallet mismatch');
 
-#[test]
-fn test_set_primary_wallet() {
-    let inheritX = setup();
-    let user = contract_address_const::<'user'>();
-    let wallet1 = contract_address_const::<'wallet1'>();
-    let wallet2 = contract_address_const::<'wallet2'>();
-    let type_personal = 'personal';
-    let type_inheritance = 'inheritance';
-    cheat_caller_address(inheritX.contract_address, user, CheatSpan::Indefinite);
-    inheritX.add_wallet(wallet1, type_personal);
-    inheritX.add_wallet(wallet2, type_inheritance);
-    let success = inheritX.set_primary_wallet(wallet2);
-    assert(success, 'err_set');
-    let primary_wallet = inheritX.get_primary_wallet(user);
-    assert(primary_wallet == wallet2, 'err2');
-    let wallets = inheritX.get_user_wallets(user);
-    let wallet = wallets.at(0);
-    assert(*wallet.is_primary == false, 'err3');
-    assert(*wallets.at(1).is_primary, 'err4');
-    assert(*wallet.wallet_type == type_personal, 'err5');
-    assert(*wallets.at(1).wallet_type == type_inheritance, 'err6');
-}
+        let wallets = dispatcher.get_user_wallets(user);
+        assert(*wallets.at(0).is_primary == false, 'wallet1 should not be primary');
+        assert(*wallets.at(1).is_primary, 'wallet2 should be primary');
+    }
 
-#[test]
-#[should_panic(expected: ('Wallet already exists',))]
-fn test_add_duplicate_wallet() {
-    let inheritX = setup();
-    let user = contract_address_const::<'user'>();
-    let wallet_addr = contract_address_const::<'wallet1'>();
-    let wallet_type = 'personal';
-    cheat_caller_address(inheritX.contract_address, user, CheatSpan::Indefinite);
-    inheritX.add_wallet(wallet_addr, wallet_type);
-    inheritX.add_wallet(wallet_addr, wallet_type);
-}
+    #[test]
+    #[should_panic(
+        expected: (
+            0x46a6158a16a947e5916b2a2ca68501a45e93d7110e81aa2d6438b1c57c879a3,
+            0x0,
+            'Wallet already exists',
+            0x15,
+        ),
+    )]
+    fn test_add_duplicate_wallet() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
+        let wallet_addr = contract_address_const::<'wallet1'>();
+        let wallet_type = 'personal';
 
-#[test]
-#[should_panic(expected: ('Wallet not found',))]
-fn test_set_primary_non_existent_wallet() {
-    let inheritX = setup();
-    let user = contract_address_const::<'user'>();
-    let non_existent_wallet = contract_address_const::<'non_existent'>();
-    cheat_caller_address(inheritX.contract_address, user, CheatSpan::Indefinite);
-    inheritX.set_primary_wallet(non_existent_wallet);
-}
+        start_cheat_caller_address(contract_address, user);
+        cheat_block_timestamp(contract_address, 1000, CheatSpan::Indefinite);
 
-#[test]
-fn test_wallet_types() {
-    let inheritX = setup();
-    let user = contract_address_const::<'user'>();
-    let wallet1 = contract_address_const::<'wallet1'>();
-    let wallet2 = contract_address_const::<'wallet2'>();
-    let type_personal = 'personal';
-    let type_inheritance = 'inheritance';
-    cheat_caller_address(inheritX.contract_address, user, CheatSpan::Indefinite);
-    inheritX.add_wallet(wallet1, type_personal);
-    inheritX.add_wallet(wallet2, type_inheritance);
-    let wallets = inheritX.get_user_wallets(user);
-    assert(wallets.len() == 2, 'err1');
-    assert(*wallets.at(0).wallet_type == type_personal, 'err2');
-    assert(*wallets.at(1).wallet_type == type_inheritance, 'err3');
+        dispatcher.add_wallet(wallet_addr, wallet_type);
+        dispatcher.add_wallet(wallet_addr, wallet_type); // Should panic
+    }
+
+    #[test]
+    #[should_panic(
+        expected: (
+            0x46a6158a16a947e5916b2a2ca68501a45e93d7110e81aa2d6438b1c57c879a3,
+            0x0,
+            'Wallet not found',
+            0x10,
+        ),
+    )]
+    fn test_set_primary_non_existent_wallet() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
+        let non_existent_wallet = contract_address_const::<'non_existent'>();
+
+        start_cheat_caller_address(contract_address, user);
+        dispatcher.set_primary_wallet(non_existent_wallet); // Should panic
+    }
+
+    #[test]
+    fn test_wallet_types() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
+        let wallet1 = contract_address_const::<'wallet1'>();
+        let wallet2 = contract_address_const::<'wallet2'>();
+        let type_personal = 'personal';
+        let type_inheritance = 'inheritance';
+
+        start_cheat_caller_address(contract_address, user);
+        cheat_block_timestamp(contract_address, 1000, CheatSpan::Indefinite);
+
+        dispatcher.add_wallet(wallet1, type_personal);
+        dispatcher.add_wallet(wallet2, type_inheritance);
+
+        let wallets = dispatcher.get_user_wallets(user);
+        assert(wallets.len() == 2, 'wallet count mismatch');
+        assert(*wallets.at(0).wallet_type == type_personal, 'type1 mismatch');
+        assert(*wallets.at(1).wallet_type == type_inheritance, 'type2 mismatch');
+    }
 }

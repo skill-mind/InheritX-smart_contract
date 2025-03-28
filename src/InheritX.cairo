@@ -482,7 +482,7 @@ pub mod InheritX {
             loop {
                 if current_index > end_index {
                     break;
-                };
+                }
 
                 let record = self.user_activities.entry(user).entry(current_index).read();
                 activity_history.append(record);
