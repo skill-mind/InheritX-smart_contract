@@ -85,7 +85,14 @@ pub trait IInheritX<TContractState> {
     fn retrieve_claim(ref self: TContractState, inheritance_id: u256) -> SimpleBeneficiary;
     fn transfer_funds(ref self: TContractState, beneficiary: ContractAddress, amount: u256);
     fn test_deployment(ref self: TContractState) -> bool;
-
+    fn is_verified(self: @TContractState, user: ContractAddress) -> bool;
+    // fn generate_verification_code(ref self: TContractState, user: ContractAddress) -> felt252;
+    fn complete_verififcation(ref self: TContractState, user: ContractAddress, code: felt252);
+    fn start_verification(ref self: TContractState, user: ContractAddress) -> felt252;
+    fn check_expiry(ref self: TContractState, user: ContractAddress) -> bool;
+    fn get_verification_status(
+        ref self: TContractState, code: felt252, user: ContractAddress,
+    ) -> bool;
     fn get_activity_history(
         self: @TContractState, user: ContractAddress, start_index: u256, page_size: u256,
     ) -> Array<ActivityRecord>;
@@ -100,7 +107,11 @@ pub trait IInheritX<TContractState> {
         profile_image: felt252,
     ) -> bool;
     fn get_profile(ref self: TContractState, address: ContractAddress) -> UserProfile;
+<<<<<<< HEAD
 
     fn update_security_settings(ref self: TContractState, new_settings: SecuritySettings);
 
+=======
+    fn delete_user_profile(ref self: TContractState, address: ContractAddress) -> bool;
+>>>>>>> bd89cb8d69e62c9529112814e96c2159fc19a2b9
 }

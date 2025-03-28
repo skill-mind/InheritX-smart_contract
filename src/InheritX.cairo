@@ -1,16 +1,21 @@
 #[starknet::contract]
 pub mod InheritX {
     use core::num::traits::Zero;
+    use core::traits::Into;
     use starknet::storage::{
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePathEntry,
         StoragePointerReadAccess, StoragePointerWriteAccess,
     };
-    use starknet::{ContractAddress, get_block_timestamp, get_caller_address, get_contract_address};
+    use starknet::{
+        ContractAddress, contract_address_const, get_block_timestamp, get_caller_address,
+        get_contract_address,
+    };
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
     use crate::types::{
         ActivityRecord, ActivityType, NotificationSettings, SecuritySettings, SimpleBeneficiary,
         UserProfile, UserRole, VerificationStatus,
     };
+
 
     #[storage]
     struct Storage {
@@ -54,6 +59,11 @@ pub mod InheritX {
         // storage mappings for plan_name and description
         plan_names: Map<u256, felt252>,
         plan_descriptions: Map<u256, felt252>,
+        //Identity verification system
+        verification_code: Map<ContractAddress, felt252>,
+        verification_status: Map<ContractAddress, bool>,
+        verification_attempts: Map<ContractAddress, u8>,
+        verification_expiry: Map<ContractAddress, u64>,
         user_profiles: Map<ContractAddress, UserProfile>,
     }
 
@@ -314,6 +324,64 @@ pub mod InheritX {
             self.deployed.read()
         }
 
+        fn start_verification(ref self: ContractState, user: ContractAddress) -> felt252 {
+            assert(!self.verification_status.read(user), 'Already verified');
+
+            // Generate random code
+            // let code = self.generate_verification_code(user);
+            let code = 123456;
+
+            // store code with expiry
+            let expiry = get_block_timestamp() + 600; // 10 minutes in seconds
+            self.verification_code.write(user, code);
+            self.verification_expiry.write(user, expiry);
+            self.verification_attempts.write(user, 0);
+
+            // send code to user via SMS or email
+            code
+        }
+        fn check_expiry(ref self: ContractState, user: ContractAddress) -> bool {
+            let expiry = self.verification_expiry.read(user);
+            assert(get_block_timestamp() < expiry, 'Code expired');
+            true
+        }
+
+        fn complete_verififcation(ref self: ContractState, user: ContractAddress, code: felt252) {
+            // check attempts
+            let attempts = self.verification_attempts.read(user);
+            assert(attempts < 3, 'Maximum attempts reached');
+
+            // check expiry
+            let check_expiry = self.check_expiry(user);
+            assert(check_expiry == true, 'Check expiry failed');
+            // verify code
+            self.get_verification_status(code, user);
+        }
+
+        fn get_verification_status(
+            ref self: ContractState, code: felt252, user: ContractAddress,
+        ) -> bool {
+            let stored_code = self.verification_code.read(user);
+            let attempts = self.verification_attempts.read(user);
+            if stored_code == code {
+                self.verification_status.write(user, true);
+                true
+            } else {
+                self.verification_attempts.write(user, attempts + 1);
+                false
+            }
+        }
+
+        /// Check verification status
+        fn is_verified(self: @ContractState, user: ContractAddress) -> bool {
+            self.verification_status.read(user)
+        }
+
+        /// Adds a media message to a specific plan.
+        /// @param self - The contract state.
+        /// @param plan_id - The ID of the plan.
+        /// @param media_type - The type of media (e.g., 0 for image, 1 for video).
+        /// @param media_content - The content of the media (e.g., IPFS hash or URL as felt252).
         fn add_beneficiary(
             ref self: ContractState,
             plan_id: u256,
@@ -411,7 +479,7 @@ pub mod InheritX {
             loop {
                 if current_index > end_index {
                     break;
-                }
+                };
 
                 let record = self.user_activities.entry(user).entry(current_index).read();
                 activity_history.append(record);
@@ -430,12 +498,40 @@ pub mod InheritX {
             self.total_plans.read()
         }
 
+<<<<<<< HEAD
         fn update_security_settings(ref self: ContractState, new_settings: SecuritySettings) {
             let caller = get_caller_address();
             let mut profile = self.user_profiles.read(caller);
             assert(profile.address == caller, 'Profile does not exist');
             profile.security_settings = new_settings;
             self.user_profiles.write(caller, profile);
+=======
+        fn delete_user_profile(ref self: ContractState, address: ContractAddress) -> bool {
+            let admin = self.admin.read();
+            let mut user = self.user_profiles.read(address);
+            let caller = user.address;
+
+            assert(
+                get_caller_address() == admin || get_caller_address() == caller,
+                'No right to delete',
+            );
+            // user.address,
+            user.username = ' ';
+            user.address = contract_address_const::<0>();
+            user.email = ' ';
+            user.full_name = ' ';
+            user.profile_image = ' ';
+            user.verification_status = VerificationStatus::Nil;
+            user.role = UserRole::User;
+            user.notification_settings = NotificationSettings::Nil;
+            user.security_settings = SecuritySettings::Nil;
+            user.created_at = 0;
+            user.last_active = 0;
+
+            self.user_profiles.write(caller, user);
+
+            true
+>>>>>>> bd89cb8d69e62c9529112814e96c2159fc19a2b9
         }
     }
 }
