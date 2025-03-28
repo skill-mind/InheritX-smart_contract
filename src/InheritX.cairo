@@ -54,6 +54,7 @@ pub mod InheritX {
         // storage mappings for plan_name and description
         plan_names: Map<u256, felt252>,
         plan_descriptions: Map<u256, felt252>,
+        plan_status: Map<u256, PlanStatus>
         user_profiles: Map<ContractAddress, UserProfile>,
     }
 
@@ -65,6 +66,13 @@ pub mod InheritX {
         name: felt252,
         email: felt252,
     }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct PlanOverridden {
+        pub plan_id: u256,
+        pub caller: ContractAddress,
+    }
+
 
     #[event]
     #[derive(Drop, starknet::Event)]
@@ -86,6 +94,12 @@ pub mod InheritX {
     //     Rejected,
     // }
 
+    #[event]
+    #[derive(Drop, starknet::Event)]
+    enum Event {
+        PlanOverridden: PlanOverridden,
+    }
+    
     #[constructor]
     fn constructor(ref self: ContractState) {
         self.admin.write(get_caller_address());
@@ -428,6 +442,27 @@ pub mod InheritX {
 
         fn get_total_plans(self: @ContractState) -> u256 {
             self.total_plans.read()
+        }
+
+
+        fn override_plan(ref self: ContractState, plan_id: u256) {
+            // 1. Assert plan_id exists (plan_id < self.plans_count.read())
+            let plans_count = self.plans_count.read();
+            assert(plan_id < plans_count, 'Plan ID does not exist');
+            // 2. Assert caller is the asset owner (caller == self.plan_asset_owner.read(plan_id))
+            let caller = starknet::get_caller_address();
+            let owner = self.plan_asset_owner.read(plan_id);
+            assert!(caller == owner, "Not plan owner");
+            // 3. Assert plan is in valid state for override (not executed)
+            let status = self.plan_status.read(plan_id);
+            assert(status != PlanStatus::Executed, 'Already executed');
+            // 4. Assert override conditions are met (can_override_plan returns true)
+            let can_override = self.can_override_plan(plan_id);
+            assert(can_override, 'Cannot override plan');
+            // 5. Update plan status to Cancelled
+            self.plan_status.write(plan_id, PlanStatus::Cancelled);
+            // 6. Emit PlanOverridden event
+            self.emit(PlanOverridden { plan_id, caller });
         }
     }
 }
