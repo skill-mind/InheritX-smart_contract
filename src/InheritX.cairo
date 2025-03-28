@@ -1,5 +1,6 @@
 #[starknet::contract]
 pub mod InheritX {
+    use core::array::ArrayTrait;
     use core::num::traits::Zero;
     use core::traits::Into;
     use starknet::storage::{
@@ -10,7 +11,7 @@ pub mod InheritX {
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
     use crate::types::{
         ActivityRecord, ActivityType, NotificationSettings, SecuritySettings, SimpleBeneficiary,
-        UserProfile, UserRole, VerificationStatus,
+        UserProfile, UserRole, VerificationStatus, Wallet,
     };
 
 
@@ -62,6 +63,11 @@ pub mod InheritX {
         verification_attempts: Map<ContractAddress, u8>,
         verification_expiry: Map<ContractAddress, u64>,
         user_profiles: Map<ContractAddress, UserProfile>,
+        // Updated wallet-related storage mappings
+        user_wallets_length: Map<ContractAddress, u256>,
+        user_wallets: Map<(ContractAddress, u256), Wallet>,
+        user_primary_wallet: Map<ContractAddress, ContractAddress>,
+        total_user_wallets: Map<ContractAddress, u256>,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -134,7 +140,7 @@ pub mod InheritX {
                 let asset = tokens.at(i);
                 total_value += *asset.amount;
                 i += 1;
-            };
+            }
 
             // Generate new plan ID
             let plan_id = self.plans_id.read();
@@ -166,7 +172,7 @@ pub mod InheritX {
                 self.plan_assets.write((plan_id, asset_index), *tokens.at(i));
                 asset_index += 1;
                 i += 1;
-            };
+            }
             self.plan_asset_count.write(plan_id, asset_count.try_into().unwrap());
 
             // Store beneficiaries
@@ -178,7 +184,7 @@ pub mod InheritX {
                 self.is_beneficiary.write((plan_id, beneficiary), true);
                 beneficiary_index += 1;
                 i += 1;
-            };
+            }
             self.plan_beneficiaries_count.write(plan_id, beneficiary_count);
 
             // Update protocol statistics
@@ -195,7 +201,7 @@ pub mod InheritX {
                 let asset = tokens.at(i);
                 self.transfer_funds(get_contract_address(), *asset.amount);
                 i += 1;
-            };
+            }
 
             // Return the plan ID
             plan_id
@@ -476,13 +482,13 @@ pub mod InheritX {
             loop {
                 if current_index > end_index {
                     break;
-                };
+                }
 
                 let record = self.user_activities.entry(user).entry(current_index).read();
                 activity_history.append(record);
 
                 current_index += 1;
-            };
+            }
 
             activity_history
         }
@@ -493,6 +499,93 @@ pub mod InheritX {
 
         fn get_total_plans(self: @ContractState) -> u256 {
             self.total_plans.read()
+        }
+
+        // Wallet Management Functions
+        fn add_wallet(
+            ref self: ContractState, wallet: ContractAddress, wallet_type: felt252,
+        ) -> bool {
+            assert!(wallet != starknet::contract_address_const::<0>(), "Invalid wallet address");
+            let user = get_caller_address();
+            let length = self.user_wallets_length.read(user);
+
+            //
+            let mut wallet_exists = false;
+            let mut i = 0;
+            while i < length {
+                let w = self.user_wallets.read((user, i));
+                if w.address == wallet {
+                    wallet_exists = true;
+                    break;
+                }
+                i += 1;
+            }
+            assert!(!wallet_exists, "Wallet already exists");
+
+            let new_wallet = Wallet {
+                address: wallet,
+                is_primary: length == 0,
+                wallet_type,
+                added_at: get_block_timestamp(),
+            };
+            self.user_wallets.write((user, length), new_wallet);
+            self.user_wallets_length.write(user, length + 1);
+
+            if length == 0 {
+                self.user_primary_wallet.write(user, wallet);
+            }
+
+            let total_wallets = self.total_user_wallets.read(user);
+            self.total_user_wallets.write(user, total_wallets + 1);
+
+            true
+        }
+
+        fn set_primary_wallet(ref self: ContractState, wallet: ContractAddress) -> bool {
+            let user = get_caller_address();
+            let length = self.user_wallets_length.read(user);
+
+            let mut wallet_found = false;
+            let mut wallet_index = 0;
+            let mut i = 0;
+            while i < length {
+                let w = self.user_wallets.read((user, i));
+                if w.address == wallet {
+                    wallet_found = true;
+                    wallet_index = i;
+                    break;
+                }
+                i += 1;
+            }
+            assert!(wallet_found, "Wallet not found");
+
+            i = 0;
+            while i < length {
+                let mut w = self.user_wallets.read((user, i));
+                w.is_primary = (i == wallet_index);
+                self.user_wallets.write((user, i), w);
+                i += 1;
+            }
+
+            self.user_primary_wallet.write(user, wallet);
+
+            true
+        }
+
+        fn get_primary_wallet(self: @ContractState, user: ContractAddress) -> ContractAddress {
+            self.user_primary_wallet.read(user)
+        }
+
+        fn get_user_wallets(self: @ContractState, user: ContractAddress) -> Array<Wallet> {
+            let length = self.user_wallets_length.read(user);
+            let mut wallets = ArrayTrait::new();
+            let mut i = 0;
+            while i < length {
+                let wallet = self.user_wallets.read((user, i));
+                core::array::ArrayTrait::append(ref wallets, wallet);
+                i += 1;
+            }
+            wallets
         }
     }
 }
