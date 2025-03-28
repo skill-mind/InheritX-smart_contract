@@ -1,10 +1,14 @@
 // Import the contract modules
-use inheritx::interfaces::IInheritX::{IInheritX, IInheritXDispatcher, IInheritXDispatcherTrait};
+use inheritx::interfaces::IInheritX::{
+    AssetAllocation, IInheritX, IInheritXDispatcher, IInheritXDispatcherTrait,
+};
+use inheritx::types::ActivityType;
 use snforge_std::{CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_caller_address, declare};
 use starknet::ContractAddress;
 use starknet::class_hash::ClassHash;
 use starknet::contract_address::contract_address_const;
 use starknet::testing::{set_caller_address, set_contract_address};
+
 
 fn setup() -> ContractAddress {
     let declare_result = declare("InheritX");
