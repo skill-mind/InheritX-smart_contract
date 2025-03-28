@@ -1,5 +1,5 @@
 use starknet::ContractAddress;
-use starknet::storage::{Vec, VecTrait, MutableVecTrait};
+use starknet::storage::{MutableVecTrait, Vec, VecTrait};
 use crate::InheritX::InheritX::MediaMessageResponse;
 
 #[derive(Drop, Serde)]
@@ -72,16 +72,17 @@ pub struct MediaMessage {
 }
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
-#[allow(starknet::store_no_default_variant)]
 pub enum PlanStatus {
+    #[default]
     Draft,
     Active,
     Executed,
     Cancelled,
 }
 
-#[derive(Copy, Drop, Serde)]
+#[derive(Drop, Serde, PartialEq)]
 pub enum PlanSection {
+    #[default]
     BasicInformation: (),
     Beneficiaries: (),
     MediaAndRecipients: (),
