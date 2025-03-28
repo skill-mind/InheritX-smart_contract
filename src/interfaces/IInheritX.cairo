@@ -100,5 +100,7 @@ pub trait IInheritX<TContractState> {
         profile_image: felt252,
     ) -> bool;
     fn get_profile(ref self: TContractState, address: ContractAddress) -> UserProfile;
+
     fn update_security_settings(ref self: TContractState, new_settings: SecuritySettings);
+
 }

@@ -12,6 +12,7 @@ fn setup() -> IInheritXDispatcher {
     let contract_class = declare("InheritX").unwrap().contract_class();
     let mut calldata = array![];
     let (contract_address, _) = contract_class.deploy(@calldata).unwrap();
+
     IInheritXDispatcher { contract_address }
 }
 
@@ -160,9 +161,10 @@ fn test_get_activity_history_invalid_page_size() {
 fn test_update_security_settings() {
     let inheritX = setup();
     let user = contract_address_const::<'user'>();
-
-    // Create profile
+    
+    // Corrected cheat syntax (add contract address as first arg)
     cheat_caller_address(inheritX.contract_address, user, CheatSpan::Indefinite);
+
     inheritX.create_profile('username', 'email@example.com', 'Full Name', 'image_url');
 
     // Check initial security settings
@@ -182,8 +184,60 @@ fn test_update_security_settings() {
 fn test_update_security_settings_no_profile() {
     let inheritX = setup();
     let user = contract_address_const::<'user'>();
-
+    
     // Try to update settings without creating profile
     cheat_caller_address(inheritX.contract_address, user, CheatSpan::Indefinite);
+    
     inheritX.update_security_settings(SecuritySettings::Two_factor_disabled);
+}
+
+#[test]
+#[should_panic(expected: ('Caller is not the asset owner',))]
+fn test_create_plan_without_profile() {
+    let inheritX = setup();
+    
+    // 1. Generate valid attacker address
+    let user = 'user'.try_into().unwrap();
+    
+    // 2. Valid token address (could use contract_address_const)
+    let token_address = 'token_contract'.try_into().unwrap();
+     // 3. Create valid asset allocation
+    let assets = array![
+        AssetAllocation {
+            token: token_address,
+            amount: 1000,        // Must be > 0
+            percentage: 100      // Must sum to 100% across assets
+        }
+    ];
+    
+    // 4. Valid beneficiary address
+    let beneficiary = 'beneficiary'.try_into().unwrap();
+    
+    // 5. Set caller context
+    cheat_caller_address(
+        inheritX.contract_address, 
+        attacker, 
+        CheatSpan::Indefinite
+    );
+    
+    // 6. Attempt plan creation
+    inheritX.create_inheritance_plan(
+        'user_plan',
+        assets,
+        'user plan description',
+        array![beneficiary]
+    );
+}
+
+
+#[test]
+#[should_panic(expected: ('Not your claim',))]
+fn test_claim_without_profile() {
+    let inheritX = setup();
+    let attacker = 'user'.try_into().unwrap();
+    
+    cheat_caller_address(inheritX.contract_address, attacker, CheatSpan::Indefinite);
+    
+    // Attempt to claim without profile
+    inheritX.collect_claim(1, attacker, 1234);
 }
