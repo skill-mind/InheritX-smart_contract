@@ -107,4 +107,5 @@ pub trait IInheritX<TContractState> {
         profile_image: felt252,
     ) -> bool;
     fn get_profile(ref self: TContractState, address: ContractAddress) -> UserProfile;
+    fn delete_user_profile(ref self: TContractState, address: ContractAddress) -> bool;
 }
