@@ -447,7 +447,7 @@ pub mod InheritX {
     let user = get_caller_address();
     let length = self.user_wallets_length.read(user);
 
-    // Check if wallet already exists
+    //
     let mut wallet_exists = false;
     let mut i = 0;
     while i < length {
@@ -460,26 +460,26 @@ pub mod InheritX {
     };
     assert!(!wallet_exists, "Wallet already exists");
 
-    // Create and store new wallet
+    
     let new_wallet = Wallet {
         address: wallet,
-        is_primary: length == 0, // First wallet becomes primary
+        is_primary: length == 0, 
         wallet_type,
         added_at: get_block_timestamp()
     };
     self.user_wallets.write((user, length), new_wallet);
     self.user_wallets_length.write(user, length + 1);
 
-    // Update primary wallet if first wallet
+    
     if length == 0 {
         self.user_primary_wallet.write(user, wallet);
     }
 
-    // Update total wallets count
+    
     let total_wallets = self.total_user_wallets.read(user);
     self.total_user_wallets.write(user, total_wallets + 1);
 
-    true  // No semicolon here to return bool
+    true  
 }         
 
         fn set_primary_wallet(
@@ -489,7 +489,7 @@ pub mod InheritX {
             let user = get_caller_address();
             let length = self.user_wallets_length.read(user);
 
-            // Find the wallet index
+            
             let mut wallet_found = false;
             let mut wallet_index = 0;
             let mut i = 0;
@@ -504,7 +504,7 @@ pub mod InheritX {
             };
             assert!(wallet_found, "Wallet not found");
 
-            // Update primary status
+            
             i = 0;
             while i < length {
                 let mut w = self.user_wallets.read((user, i));
@@ -513,7 +513,7 @@ pub mod InheritX {
                 i += 1;
             };
 
-            // Update primary wallet mapping
+            
             self.user_primary_wallet.write(user, wallet);
 
             true
