@@ -1,7 +1,7 @@
 use inheritx::interfaces::IInheritX::{
     AssetAllocation, IInheritX, IInheritXDispatcher, IInheritXDispatcherTrait,
 };
-use inheritx::types::ActivityType;
+use inheritx::types::{ActivityType, Wallet};  // Added Wallet to support wallet tests
 use snforge_std::{CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_caller_address, declare};
 use starknet::ContractAddress;
 use starknet::class_hash::ClassHash;
@@ -155,4 +155,107 @@ fn test_get_activity_history_invalid_page_size() {
 
     // Should panic with zero page size
     inheritX.get_activity_history(user, 0, 0);
+}
+
+
+ // Wallet Management tests
+
+
+#[test]
+fn test_add_first_wallet() {
+    let inheritX = setup();
+    let user = contract_address_const::<'user'>();
+    let wallet_addr = contract_address_const::<'wallet1'>();
+    let wallet_type = 'personal';
+    cheat_caller_address(inheritX.contract_address, user, CheatSpan::Indefinite);
+    let success = inheritX.add_wallet(wallet_addr, wallet_type);
+    assert(success, 'err1');
+    let primary_wallet = inheritX.get_primary_wallet(user);
+    assert(primary_wallet == wallet_addr, 'err2');
+    let wallets = inheritX.get_user_wallets(user);
+    assert(wallets.len() == 1, 'err3');
+    let wallet = wallets.at(0);
+    assert(*wallet.address == wallet_addr, 'err4');
+    assert(*wallet.is_primary, 'err5');
+    assert(*wallet.wallet_type == wallet_type, 'err6');
+}
+
+#[test]
+fn test_add_multiple_wallets() {
+    let inheritX = setup();
+    let user = contract_address_const::<'user'>();
+    let wallet1 = contract_address_const::<'wallet1'>();
+    let wallet2 = contract_address_const::<'wallet2'>();
+    let wallet3 = contract_address_const::<'wallet3'>();
+    let wallet_type = 'personal';
+    cheat_caller_address(inheritX.contract_address, user, CheatSpan::Indefinite);
+    inheritX.add_wallet(wallet1, wallet_type);
+    inheritX.add_wallet(wallet2, wallet_type);
+    inheritX.add_wallet(wallet3, wallet_type);
+    let wallets = inheritX.get_user_wallets(user);
+    assert(wallets.len() == 3, 'err1');
+    let primary_wallet = inheritX.get_primary_wallet(user);
+    assert(primary_wallet == wallet1, 'err2');
+}
+
+#[test]
+fn test_set_primary_wallet() {
+    let inheritX = setup();
+    let user = contract_address_const::<'user'>();
+    let wallet1 = contract_address_const::<'wallet1'>();
+    let wallet2 = contract_address_const::<'wallet2'>();
+    let type_personal = 'personal';
+    let type_inheritance = 'inheritance';
+    cheat_caller_address(inheritX.contract_address, user, CheatSpan::Indefinite);
+    inheritX.add_wallet(wallet1, type_personal);
+    inheritX.add_wallet(wallet2, type_inheritance);
+    let success = inheritX.set_primary_wallet(wallet2);
+    assert(success, 'err_set');
+    let primary_wallet = inheritX.get_primary_wallet(user);
+    assert(primary_wallet == wallet2, 'err2');
+    let wallets = inheritX.get_user_wallets(user);
+    let wallet = wallets.at(0);
+    assert(*wallet.is_primary == false, 'err3');
+    assert(*wallets.at(1).is_primary, 'err4');
+    assert(*wallet.wallet_type == type_personal, 'err5');
+    assert(*wallets.at(1).wallet_type == type_inheritance, 'err6');
+}
+
+#[test]
+#[should_panic(expected: ('Wallet already exists',))]
+fn test_add_duplicate_wallet() {
+    let inheritX = setup();
+    let user = contract_address_const::<'user'>();
+    let wallet_addr = contract_address_const::<'wallet1'>();
+    let wallet_type = 'personal';
+    cheat_caller_address(inheritX.contract_address, user, CheatSpan::Indefinite);
+    inheritX.add_wallet(wallet_addr, wallet_type);
+    inheritX.add_wallet(wallet_addr, wallet_type);
+}
+
+#[test]
+#[should_panic(expected: ('Wallet not found',))]
+fn test_set_primary_non_existent_wallet() {
+    let inheritX = setup();
+    let user = contract_address_const::<'user'>();
+    let non_existent_wallet = contract_address_const::<'non_existent'>();
+    cheat_caller_address(inheritX.contract_address, user, CheatSpan::Indefinite);
+    inheritX.set_primary_wallet(non_existent_wallet);
+}
+
+#[test]
+fn test_wallet_types() {
+    let inheritX = setup();
+    let user = contract_address_const::<'user'>();
+    let wallet1 = contract_address_const::<'wallet1'>();
+    let wallet2 = contract_address_const::<'wallet2'>();
+    let type_personal = 'personal';
+    let type_inheritance = 'inheritance';
+    cheat_caller_address(inheritX.contract_address, user, CheatSpan::Indefinite);
+    inheritX.add_wallet(wallet1, type_personal);
+    inheritX.add_wallet(wallet2, type_inheritance);
+    let wallets = inheritX.get_user_wallets(user);
+    assert(wallets.len() == 2, 'err1');
+    assert(*wallets.at(0).wallet_type == type_personal, 'err2');
+    assert(*wallets.at(1).wallet_type == type_inheritance, 'err3');
 }

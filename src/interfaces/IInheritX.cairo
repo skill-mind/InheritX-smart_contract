@@ -1,6 +1,6 @@
 use starknet::ContractAddress;
 use crate::types::{ActivityRecord, ActivityType, SimpleBeneficiary, UserProfile};
-
+use crate::types::Wallet;
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct InheritancePlan {
     pub owner: ContractAddress,
@@ -100,4 +100,11 @@ pub trait IInheritX<TContractState> {
         profile_image: felt252,
     ) -> bool;
     fn get_profile(ref self: TContractState, address: ContractAddress) -> UserProfile;
+
+    
+    // New Wallet Management Methods
+    fn add_wallet(ref self: TContractState, wallet: ContractAddress, wallet_type: felt252) -> bool;
+    fn set_primary_wallet(ref self: TContractState, wallet: ContractAddress) -> bool;
+    fn get_primary_wallet(self: @TContractState, user: ContractAddress) -> ContractAddress;
+    fn get_user_wallets(self: @TContractState, user: ContractAddress) -> Array<Wallet>;
 }
