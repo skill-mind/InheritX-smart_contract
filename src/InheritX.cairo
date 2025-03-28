@@ -5,7 +5,10 @@ pub mod InheritX {
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePathEntry,
         StoragePointerReadAccess, StoragePointerWriteAccess,
     };
-    use starknet::{ContractAddress, get_block_timestamp, get_caller_address, get_contract_address};
+    use starknet::{
+        ContractAddress, contract_address_const, get_block_timestamp, get_caller_address,
+        get_contract_address,
+    };
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
     use crate::types::{
         ActivityRecord, ActivityType, NotificationSettings, SecuritySettings, SimpleBeneficiary,
@@ -127,7 +130,7 @@ pub mod InheritX {
                 let asset = tokens.at(i);
                 total_value += *asset.amount;
                 i += 1;
-            };
+            }
 
             // Generate new plan ID
             let plan_id = self.plans_id.read();
@@ -159,7 +162,7 @@ pub mod InheritX {
                 self.plan_assets.write((plan_id, asset_index), *tokens.at(i));
                 asset_index += 1;
                 i += 1;
-            };
+            }
             self.plan_asset_count.write(plan_id, asset_count.try_into().unwrap());
 
             // Store beneficiaries
@@ -171,7 +174,7 @@ pub mod InheritX {
                 self.is_beneficiary.write((plan_id, beneficiary), true);
                 beneficiary_index += 1;
                 i += 1;
-            };
+            }
             self.plan_beneficiaries_count.write(plan_id, beneficiary_count);
 
             // Update protocol statistics
@@ -188,7 +191,7 @@ pub mod InheritX {
                 let asset = tokens.at(i);
                 self.transfer_funds(get_contract_address(), *asset.amount);
                 i += 1;
-            };
+            }
 
             // Return the plan ID
             plan_id
@@ -417,7 +420,7 @@ pub mod InheritX {
                 activity_history.append(record);
 
                 current_index += 1;
-            };
+            }
 
             activity_history
         }
@@ -428,6 +431,33 @@ pub mod InheritX {
 
         fn get_total_plans(self: @ContractState) -> u256 {
             self.total_plans.read()
+        }
+
+        fn delete_user_profile(ref self: ContractState, address: ContractAddress) -> bool {
+            let admin = self.admin.read();
+            let mut user = self.user_profiles.read(address);
+            let caller = user.address;
+
+            assert(
+                get_caller_address() == admin || get_caller_address() == caller,
+                'No right to delete',
+            );
+            // user.address,
+            user.username = ' ';
+            user.address = contract_address_const::<0>();
+            user.email = ' ';
+            user.full_name = ' ';
+            user.profile_image = ' ';
+            user.verification_status = VerificationStatus::Nil;
+            user.role = UserRole::User;
+            user.notification_settings = NotificationSettings::Nil;
+            user.security_settings = SecuritySettings::Nil;
+            user.created_at = 0;
+            user.last_active = 0;
+
+            self.user_profiles.write(caller, user);
+
+            true
         }
     }
 }
