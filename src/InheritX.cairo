@@ -6,13 +6,15 @@ pub mod InheritX {
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePathEntry,
         StoragePointerReadAccess, StoragePointerWriteAccess,
     };
-    use starknet::{ContractAddress, get_block_timestamp, get_caller_address, get_contract_address};
+    use starknet::{
+        ContractAddress, contract_address_const, get_block_timestamp, get_caller_address,
+        get_contract_address,
+    };
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
     use crate::types::{
         ActivityRecord, ActivityType, NotificationSettings, NotificationStruct, SecuritySettings,
         SimpleBeneficiary, UserProfile, UserRole, VerificationStatus,
     };
-
 
     #[storage]
     struct Storage {
@@ -462,7 +464,6 @@ pub mod InheritX {
             beneficiary
         }
 
-
         fn is_beneficiary(self: @ContractState, plan_id: u256, address: ContractAddress) -> bool {
             self.is_beneficiary.read((plan_id, address))
         }
@@ -550,6 +551,33 @@ pub mod InheritX {
         ) -> NotificationStruct {
             let notification = self.user_notifications.read(user);
             notification
+        }
+
+        fn delete_user_profile(ref self: ContractState, address: ContractAddress) -> bool {
+            let admin = self.admin.read();
+            let mut user = self.user_profiles.read(address);
+            let caller = user.address;
+
+            assert(
+                get_caller_address() == admin || get_caller_address() == caller,
+                'No right to delete',
+            );
+            // user.address,
+            user.username = ' ';
+            user.address = contract_address_const::<0>();
+            user.email = ' ';
+            user.full_name = ' ';
+            user.profile_image = ' ';
+            user.verification_status = VerificationStatus::Nil;
+            user.role = UserRole::User;
+            user.notification_settings = NotificationSettings::Nil;
+            user.security_settings = SecuritySettings::Nil;
+            user.created_at = 0;
+            user.last_active = 0;
+
+            self.user_profiles.write(caller, user);
+
+            true
         }
     }
 }

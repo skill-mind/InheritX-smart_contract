@@ -125,4 +125,6 @@ pub trait IInheritX<TContractState> {
     fn get_all_notification_preferences(
         ref self: TContractState, user: ContractAddress,
     ) -> NotificationStruct;
+
+    fn delete_user_profile(ref self: TContractState, address: ContractAddress) -> bool;
 }

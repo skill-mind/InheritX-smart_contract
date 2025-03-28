@@ -78,7 +78,6 @@ mod tests {
         assert(verification_status_after == true, 'should not be unverified');
     }
 
-
     #[test]
     fn test_get_activity_history_empty() {
         let (dispatcher, contract_address) = setup();
@@ -219,7 +218,6 @@ mod tests {
         dispatcher.create_inheritance_plan(plan_name, assets, description, pick_beneficiaries);
     }
 
-
     #[test]
     fn test_get_all_notification_preferences() {
         let (dispatcher, contract_address) = setup();
@@ -254,7 +252,7 @@ mod tests {
         assert(notification.security_alerts == true, 'should be true');
         assert(notification.marketing_updates == true, 'should be true');
     }
-   
+
     #[test]
     fn test_confirm_update_notification_preferences() {
         let (dispatcher, contract_address) = setup();
@@ -293,7 +291,6 @@ mod tests {
         assert(notification.security_alerts == false, 'should be false');
         assert(notification.marketing_updates == true, 'should be true');
     }
-
 
     #[test]
     fn test_event_notification_preferences() {
