@@ -216,7 +216,7 @@ fn test_create_plan_without_profile() {
     // 5. Set caller context
     cheat_caller_address(
         inheritX.contract_address, 
-        attacker, 
+        user, 
         CheatSpan::Indefinite
     );
     
