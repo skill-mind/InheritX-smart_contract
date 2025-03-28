@@ -1,5 +1,6 @@
 use starknet::ContractAddress;
 use starknet::storage::{Vec, VecTrait, MutableVecTrait};
+use crate::InheritX::InheritX::MediaMessageResponse;
 
 #[derive(Drop, Serde)]
 pub struct PlanOverview {
@@ -15,7 +16,7 @@ pub struct PlanOverview {
     pub total_value: u256,
     // Additional details fields for the plan
     pub beneficiaries: Array<SimpleBeneficiary>,
-    pub media_messages: Array<MediaMessage>,
+    pub media_messages: Array<MediaMessageResponse>,
 }
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
@@ -62,12 +63,12 @@ pub struct PlanConditions {
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct MediaMessage {
-    file_hash: felt252,
-    file_name: felt252,
-    file_type: felt252,
-    file_size: u64,
-    recipients: Vec<ContractAddress>,
-    upload_date: u64,
+    pub file_hash: felt252,
+    pub file_name: felt252,
+    pub file_type: felt252,
+    pub file_size: u64,
+    pub recipients_count: u32,
+    pub upload_date: u64,
 }
 
 #[derive(Copy, Drop, Serde, starknet::Store)]

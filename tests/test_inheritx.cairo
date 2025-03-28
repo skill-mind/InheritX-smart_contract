@@ -1,7 +1,7 @@
 use inheritx::interfaces::IInheritX::{
     AssetAllocation, IInheritX, IInheritXDispatcher, IInheritXDispatcherTrait,
 };
-use inheritx::types::ActivityType;
+use inheritx::types::{ActivityType, MediaMessage, SimpleBeneficiary, PlanSection, PlanOverview, TokenInfo, PlanStatus, PlanConditions};
 use snforge_std::{CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_caller_address, declare};
 use starknet::ContractAddress;
 use starknet::class_hash::ClassHash;
@@ -156,3 +156,87 @@ fn test_get_activity_history_invalid_page_size() {
     // Should panic with zero page size
     inheritX.get_activity_history(user, 0, 0);
 }
+
+// Helper function to setup contract with a test plan
+fn setup_with_plan() -> (IInheritXDispatcher, u256) {
+    let inheritx = setup();
+    let owner: ContractAddress = contract_address_const::<'owner'>();
+    let beneficiary1: ContractAddress = contract_address_const::<'beneficiary1'>();
+    let beneficiary2: ContractAddress = contract_address_const::<'beneficiary2'>();
+    let recipient1: ContractAddress = contract_address_const::<'recipient1'>();
+    let recipient2: ContractAddress = contract_address_const::<'recipient2'>();
+
+    // Create test plan through contract calls
+    let plan_id = inheritx.create_inheritance_plan(
+        'Test Plan',
+        array![
+            AssetAllocation { token: owner, amount: 1000, percentage: 50 },
+            AssetAllocation { token: owner, amount: 2000, percentage: 50 }
+        ],
+        'Test Description',
+        array![beneficiary1, beneficiary2]
+    );
+
+    // To test media messages, we would need to add a function to the contract interface
+    // that allows adding media messages with recipients. Since that doesn't exist in your
+    // current interface, we'll focus on testing the beneficiaries section which we can
+    // properly set up through create_inheritance_plan
+
+    (inheritx, plan_id)
+}
+
+#[test]
+fn test_get_basic_information_section() {
+    let (inheritx, plan_id) = setup_with_plan();
+    
+    let result = inheritx.get_plan_section(plan_id, PlanSection::BasicInformation);
+    
+    // Verify basic fields
+    assert(result.name.into() == 'Test Plan', 'Incorrect plan name');
+    assert(result.description.into() == 'Test Description', 'Incorrect description');
+    
+    // Verify tokens were loaded
+    assert(result.tokens_transferred.len() == 2, 'Should have 2 tokens');
+    
+    // Verify other sections empty
+    assert(result.beneficiaries.len() == 0, 'Beneficiaries should be empty');
+}
+
+#[test]
+fn test_get_beneficiaries_section() {
+    let (inheritx, plan_id) = setup_with_plan();
+    
+    let result = inheritx.get_plan_section(plan_id, PlanSection::Beneficiaries);
+    
+    // Verify beneficiaries
+    assert(result.beneficiaries.len() == 2, 'Should have 2 beneficiaries');
+}
+
+#[test]
+#[should_panic(expected: ('Plan does not exist',))]
+fn test_get_nonexistent_plan_section() {
+    let inheritx = setup();
+    inheritx.get_plan_section(999_u256, PlanSection::BasicInformation);
+}
+
+#[test]
+fn test_empty_sections() {
+    let inheritx = setup();
+    let owner: ContractAddress = contract_address_const::<'owner'>();
+    
+    // Create minimal plan
+    let plan_id = inheritx.create_inheritance_plan(
+        'Empty Plan',
+        array![AssetAllocation { token: owner, amount: 1000, percentage: 100 }],
+        'Empty Description',
+        array![owner]
+    );
+
+    // Test all sections
+    let basic = inheritx.get_plan_section(plan_id, PlanSection::BasicInformation);
+    assert(basic.tokens_transferred.len() == 1, 'Should have tokens');
+    
+    let beneficiaries = inheritx.get_plan_section(plan_id, PlanSection::Beneficiaries);
+    assert!(beneficiaries.beneficiaries.len() == 1, "Should have owner as beneficiary");
+}
+
