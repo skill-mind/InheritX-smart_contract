@@ -429,5 +429,13 @@ pub mod InheritX {
         fn get_total_plans(self: @ContractState) -> u256 {
             self.total_plans.read()
         }
+
+        fn update_security_settings(ref self: ContractState, new_settings: SecuritySettings) {
+            let caller = get_caller_address();
+            let mut profile = self.user_profiles.read(caller);
+            assert(profile.address == caller, 'Profile does not exist');
+            profile.security_settings = new_settings;
+            self.user_profiles.write(caller, profile);
+        }
     }
 }

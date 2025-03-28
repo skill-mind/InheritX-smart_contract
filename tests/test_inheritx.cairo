@@ -1,13 +1,12 @@
 use inheritx::interfaces::IInheritX::{
     AssetAllocation, IInheritX, IInheritXDispatcher, IInheritXDispatcherTrait,
 };
-use inheritx::types::ActivityType;
+use inheritx::types::{ActivityType, SecuritySettings};
 use snforge_std::{CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_caller_address, declare};
 use starknet::ContractAddress;
 use starknet::class_hash::ClassHash;
 use starknet::contract_address::contract_address_const;
 use starknet::testing::{set_caller_address, set_contract_address};
-
 
 fn setup() -> IInheritXDispatcher {
     let contract_class = declare("InheritX").unwrap().contract_class();
@@ -155,4 +154,36 @@ fn test_get_activity_history_invalid_page_size() {
 
     // Should panic with zero page size
     inheritX.get_activity_history(user, 0, 0);
+}
+
+#[test]
+fn test_update_security_settings() {
+    let inheritX = setup();
+    let user = contract_address_const::<'user'>();
+
+    // Create profile
+    cheat_caller_address(inheritX.contract_address, user, CheatSpan::Indefinite);
+    inheritX.create_profile('username', 'email@example.com', 'Full Name', 'image_url');
+
+    // Check initial security settings
+    let profile = inheritX.get_profile(user);
+    assert(profile.security_settings == SecuritySettings::Two_factor_enabled, 'initial settings incorrect');
+
+    // Update security settings to Two_factor_disabled
+    inheritX.update_security_settings(SecuritySettings::Two_factor_disabled);
+
+    // Check updated settings
+    let updated_profile = inheritX.get_profile(user);
+    assert(updated_profile.security_settings == SecuritySettings::Two_factor_disabled, 'settings not updated');
+}
+
+#[test]
+#[should_panic(expected: ('Profile does not exist',))]
+fn test_update_security_settings_no_profile() {
+    let inheritX = setup();
+    let user = contract_address_const::<'user'>();
+
+    // Try to update settings without creating profile
+    cheat_caller_address(inheritX.contract_address, user, CheatSpan::Indefinite);
+    inheritX.update_security_settings(SecuritySettings::Two_factor_disabled);
 }
