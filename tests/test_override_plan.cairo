@@ -1,10 +1,12 @@
-use inheritx::interfaces::IInheritXPlan::{IInheritXPlanDispatcher, IInheritXPlanDispatcherTrait};
-use snforge_std::{ContractClassTrait, DeclareResultTrait, declare, cheat_caller_address, CheatSpan, storage_write, storage_read};
-use starknet::ContractAddress;
-use starknet::contract_address_const;
 use array::ArrayTrait;
-use inheritx::enums::PlanStatus;
 use core::traits::Into;
+use inheritx::enums::PlanStatus;
+use inheritx::interfaces::IInheritXPlan::{IInheritXPlanDispatcher, IInheritXPlanDispatcherTrait};
+use snforge_std::{
+    CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_caller_address, declare, storage_read,
+    storage_write,
+};
+use starknet::{ContractAddress, contract_address_const};
 
 fn setup() -> IInheritXPlanDispatcher {
     let contract_class = declare("InheritxPlan").unwrap().contract_class();
@@ -24,12 +26,21 @@ fn test_override_plan_real_logic() {
     cheat_caller_address(contract_address, owner, CheatSpan::Indefinite);
 
     storage_write(contract_address, "InheritxPlan::Storage::plans_count", array![], 1);
-    storage_write(contract_address, "InheritxPlan::Storage::plan_asset_owner", array![plan_id], owner);
-    storage_write(contract_address, "InheritxPlan::Storage::plan_status", array![plan_id], PlanStatus::Active.into());
+    storage_write(
+        contract_address, "InheritxPlan::Storage::plan_asset_owner", array![plan_id], owner,
+    );
+    storage_write(
+        contract_address,
+        "InheritxPlan::Storage::plan_status",
+        array![plan_id],
+        PlanStatus::Active.into(),
+    );
 
     dispatcher.override_plan(plan_id);
 
-    let result = storage_read::<u8>(contract_address, "InheritxPlan::Storage::plan_status", array![plan_id]);
+    let result = storage_read::<
+        u8,
+    >(contract_address, "InheritxPlan::Storage::plan_status", array![plan_id]);
     assert(result == PlanStatus::Cancelled.into(), 'Expected plan to be Cancelled');
 }
 
@@ -44,7 +55,9 @@ fn test_override_plan_invalid_plan_id() {
 
     cheat_caller_address(contract_address, owner, CheatSpan::Indefinite);
 
-    storage_write(contract_address, "InheritxPlan::Storage::plans_count", array![], 0); // ningún plan
+    storage_write(
+        contract_address, "InheritxPlan::Storage::plans_count", array![], 0,
+    ); // ningún plan
 
     dispatcher.override_plan(plan_id);
 }
@@ -62,8 +75,15 @@ fn test_override_plan_wrong_owner() {
     cheat_caller_address(contract_address, caller, CheatSpan::Indefinite);
 
     storage_write(contract_address, "InheritxPlan::Storage::plans_count", array![], 1);
-    storage_write(contract_address, "InheritxPlan::Storage::plan_asset_owner", array![plan_id], actual_owner);
-    storage_write(contract_address, "InheritxPlan::Storage::plan_status", array![plan_id], PlanStatus::Active.into());
+    storage_write(
+        contract_address, "InheritxPlan::Storage::plan_asset_owner", array![plan_id], actual_owner,
+    );
+    storage_write(
+        contract_address,
+        "InheritxPlan::Storage::plan_status",
+        array![plan_id],
+        PlanStatus::Active.into(),
+    );
 
     dispatcher.override_plan(plan_id);
 }
@@ -80,8 +100,15 @@ fn test_override_plan_already_executed() {
     cheat_caller_address(contract_address, owner, CheatSpan::Indefinite);
 
     storage_write(contract_address, "InheritxPlan::Storage::plans_count", array![], 1);
-    storage_write(contract_address, "InheritxPlan::Storage::plan_asset_owner", array![plan_id], owner);
-    storage_write(contract_address, "InheritxPlan::Storage::plan_status", array![plan_id], PlanStatus::Executed.into());
+    storage_write(
+        contract_address, "InheritxPlan::Storage::plan_asset_owner", array![plan_id], owner,
+    );
+    storage_write(
+        contract_address,
+        "InheritxPlan::Storage::plan_status",
+        array![plan_id],
+        PlanStatus::Executed.into(),
+    );
 
     dispatcher.override_plan(plan_id);
 }
@@ -98,8 +125,15 @@ fn test_override_plan_cannot_override_logic() {
     cheat_caller_address(contract_address, owner, CheatSpan::Indefinite);
 
     storage_write(contract_address, "InheritxPlan::Storage::plans_count", array![], 1);
-    storage_write(contract_address, "InheritxPlan::Storage::plan_asset_owner", array![plan_id], owner);
-    storage_write(contract_address, "InheritxPlan::Storage::plan_status", array![plan_id], PlanStatus::Draft.into());
+    storage_write(
+        contract_address, "InheritxPlan::Storage::plan_asset_owner", array![plan_id], owner,
+    );
+    storage_write(
+        contract_address,
+        "InheritxPlan::Storage::plan_status",
+        array![plan_id],
+        PlanStatus::Draft.into(),
+    );
 
     dispatcher.override_plan(plan_id);
 }
