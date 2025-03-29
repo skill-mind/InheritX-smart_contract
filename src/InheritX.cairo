@@ -580,16 +580,17 @@ pub mod InheritX {
             true
         }
 
-        fn update_security_settings(ref self: ContractState, new_settings: SecuritySettings) -> bool {
+        fn update_security_settings(
+            ref self: ContractState, new_settings: SecuritySettings,
+        ) -> bool {
             let caller = get_caller_address();
             let mut profile = self.user_profiles.read(caller);
             assert(profile.address == caller, 'Profile does not exist');
             profile.security_settings = new_settings;
-            
+
             self.user_profiles.write(caller, profile);
 
             true
         }
     }
-
 }

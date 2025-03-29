@@ -5,7 +5,7 @@ mod tests {
         AssetAllocation, IInheritX, IInheritXDispatcher, IInheritXDispatcherTrait,
     };
 
-    use inheritx::types::{ActivityType,SecuritySettings,};
+    use inheritx::types::{ActivityType, SecuritySettings};
     use snforge_std::{
         CheatSpan, ContractClassTrait, DeclareResultTrait, EventSpyAssertionsTrait,
         cheat_caller_address, declare, spy_events, start_cheat_caller_address,
@@ -314,36 +314,41 @@ mod tests {
 
     #[test]
     fn test_update_security_settings() {
-        let (IInheritXDispatcher,contract_address) = setup();
+        let (IInheritXDispatcher, contract_address) = setup();
         let user = contract_address_const::<'user'>();
 
-        
         start_cheat_caller_address(contract_address, user);
-        IInheritXDispatcher.create_profile('username', 'email@example.com', 'Full Name', 'image_url');
+        IInheritXDispatcher
+            .create_profile('username', 'email@example.com', 'Full Name', 'image_url');
 
         // Check initial security settings
         let profile = IInheritXDispatcher.get_profile(user);
-        assert(profile.security_settings == SecuritySettings::Two_factor_enabled, 'initial settings incorrect');
+        assert(
+            profile.security_settings == SecuritySettings::Two_factor_enabled,
+            'initial settings incorrect',
+        );
 
         // Update security settings to Two_factor_disabled
         IInheritXDispatcher.update_security_settings(SecuritySettings::Two_factor_disabled);
 
         // Check updated settings
         let updated_profile = IInheritXDispatcher.get_profile(user);
-        assert(updated_profile.security_settings == SecuritySettings::Two_factor_disabled, 'settings not updated');
+        assert(
+            updated_profile.security_settings == SecuritySettings::Two_factor_disabled,
+            'settings not updated',
+        );
     }
 
     #[test]
     #[should_panic(expected: ('Profile does not exist',))]
     fn test_update_security_settings_no_profile() {
-        let (IInheritXDispatcher,contract_address) = setup();
+        let (IInheritXDispatcher, contract_address) = setup();
         let user = contract_address_const::<'user'>();
 
         // Try to update settings without creating profile
         start_cheat_caller_address(contract_address, user);
 
         IInheritXDispatcher.update_security_settings(SecuritySettings::Two_factor_disabled);
-
     }
     #[test]
     fn test_create_plan_without_profile() {
@@ -351,27 +356,19 @@ mod tests {
         let user = 'user'.try_into().unwrap();
         let token_address = 'token_contract'.try_into().unwrap();
         let beneficiary = 'beneficiary'.try_into().unwrap();
-    
+
         // Valid inputs
         let assets = array![
-            AssetAllocation {
-                token: token_address,
-                amount: 1000,
-                percentage: 100
-            }
+            AssetAllocation { token: token_address, amount: 1000, percentage: 100 },
         ];
         let beneficiaries = array![beneficiary];
-    
+
         // Set caller
         start_cheat_caller_address(contract_address, user);
         // Create plan without a profile
-        let plan_id = IInheritXDispatcher.create_inheritance_plan(
-            'user_plan',
-            assets,
-            'user plan description',
-            beneficiaries
-        );
-    
+        let plan_id = IInheritXDispatcher
+            .create_inheritance_plan('user_plan', assets, 'user plan description', beneficiaries);
+
         // Verify the plan was created
         let plan = IInheritXDispatcher.get_inheritance_plan(plan_id);
         assert(plan.is_active, 'Plan should be active');
@@ -383,7 +380,7 @@ mod tests {
     #[test]
     #[should_panic(expected: ('Not your claim',))]
     fn test_claim_without_profile() {
-        let (IInheritXDispatcher,contract_address) = setup();
+        let (IInheritXDispatcher, contract_address) = setup();
         let user = 'user'.try_into().unwrap();
 
         start_cheat_caller_address(contract_address, user);
