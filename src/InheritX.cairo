@@ -17,7 +17,6 @@ pub mod InheritX {
         TokenInfo, UserProfile, UserRole, VerificationStatus,
     };
 
-
     #[storage]
     struct Storage {
         admin: ContractAddress,
@@ -85,6 +84,8 @@ pub mod InheritX {
         verification_attempts: Map<ContractAddress, u8>,
         verification_expiry: Map<ContractAddress, u64>,
         user_profiles: Map<ContractAddress, UserProfile>,
+        // storage mappings for notification
+        user_notifications: Map<ContractAddress, NotificationStruct>,
     }
 
     // Response-only struct (not stored)
@@ -107,11 +108,23 @@ pub mod InheritX {
         email: felt252,
     }
 
+    #[derive(Drop, starknet::Event)]
+    struct NotificationUpdated {
+        email_notifications: bool,
+        push_notifications: bool,
+        claim_alerts: bool,
+        plan_updates: bool,
+        security_alerts: bool,
+        marketing_updates: bool,
+        user: ContractAddress,
+    }
+
     #[event]
     #[derive(Drop, starknet::Event)]
     pub enum Event {
         ActivityRecordEvent: ActivityRecordEvent,
         BeneficiaryAdded: BeneficiaryAdded,
+        NotificationUpdated: NotificationUpdated,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -119,7 +132,7 @@ pub mod InheritX {
         user: ContractAddress,
         activity_id: u256,
     }
-    //     #[derive(Copy, Drop, Serde)]
+    //     #[derive(Copy, Drop, Serde)]ze
     //  enum VerificationStatus {
     //     Unverified,
     //     PendingVerification,
@@ -503,7 +516,7 @@ pub mod InheritX {
             loop {
                 if current_index > end_index {
                     break;
-                };
+                }
 
                 let record = self.user_activities.entry(user).entry(current_index).read();
                 activity_history.append(record);
@@ -527,6 +540,49 @@ pub mod InheritX {
 
         fn get_total_plans(self: @ContractState) -> u256 {
             self.total_plans.read()
+        }
+        fn update_notification(
+            ref self: ContractState,
+            user: ContractAddress,
+            email_notifications: bool,
+            push_notifications: bool,
+            claim_alerts: bool,
+            plan_updates: bool,
+            security_alerts: bool,
+            marketing_updates: bool,
+        ) -> NotificationStruct {
+            let user_notification = self.get_all_notification_preferences(user);
+            let updated_notification = NotificationStruct {
+                email_notifications: email_notifications,
+                push_notifications: push_notifications,
+                claim_alerts: claim_alerts,
+                plan_updates: plan_updates,
+                security_alerts: security_alerts,
+                marketing_updates: marketing_updates,
+            };
+            self.user_notifications.write(user, updated_notification);
+            self
+                .emit(
+                    Event::NotificationUpdated(
+                        NotificationUpdated {
+                            email_notifications,
+                            push_notifications,
+                            claim_alerts,
+                            plan_updates,
+                            security_alerts,
+                            marketing_updates,
+                            user,
+                        },
+                    ),
+                );
+            updated_notification
+        }
+
+        fn get_all_notification_preferences(
+            ref self: ContractState, user: ContractAddress,
+        ) -> NotificationStruct {
+            let notification = self.user_notifications.read(user);
+            notification
         }
 
         fn get_plan_section(

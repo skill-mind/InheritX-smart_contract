@@ -1,15 +1,18 @@
-use inheritx::InheritX::InheritX;
-use inheritx::interfaces::IInheritX::{
-    AssetAllocation, IInheritX, IInheritXDispatcher, IInheritXDispatcherTrait,
-};
-use inheritx::types::{ActivityType,MediaMessage, PlanConditions, PlanOverview, PlanSection, PlanStatus,
-SimpleBeneficiary, TokenInfo, UserProfile};
-use snforge_std::{CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_caller_address, declare, start_cheat_caller_address, stop_cheat_caller_address,};
-use starknet::ContractAddress;
-use starknet::class_hash::ClassHash;
-use starknet::contract_address::contract_address_const;
-use starknet::testing::{set_caller_address, set_contract_address};
-
+#[cfg(test)]
+mod tests {
+    use inheritx::InheritX::InheritX;
+    use inheritx::types::{ActivityType,MediaMessage, PlanConditions, PlanOverview, PlanSection, PlanStatus,
+    SimpleBeneficiary, TokenInfo, UserProfile};
+    use inheritx::types::ActivityType;
+    use snforge_std::{
+        CheatSpan, ContractClassTrait, DeclareResultTrait, EventSpyAssertionsTrait,
+        cheat_caller_address, declare, spy_events, start_cheat_caller_address,
+        stop_cheat_caller_address,
+    };
+    use starknet::class_hash::ClassHash;
+    use starknet::testing::{set_caller_address, set_contract_address};
+    use starknet::{ContractAddress, contract_address_const};
+    use super::*;
 
     // Sets up the environment for testing
     fn setup() -> (IInheritXDispatcher, ContractAddress) {
@@ -73,7 +76,6 @@ use starknet::testing::{set_caller_address, set_contract_address};
         let verification_status_after = dispatcher.get_verification_status(20, caller);
         assert(verification_status_after == true, 'should not be unverified');
     }
-
 
     #[test]
     fn test_get_activity_history_empty() {
@@ -216,33 +218,33 @@ use starknet::testing::{set_caller_address, set_contract_address};
         dispatcher.create_inheritance_plan(plan_name, assets, description, pick_beneficiaries);
 }
 
-// Helper function to setup contract with a test plan
-fn setup_with_plan() -> (IInheritXDispatcher, u256, ContractAddress) {
-    let (IInheritXDispatcher, contract_address) = setup();
-    let dispatcher = IInheritXDispatcher { contract_address };
-    let owner: ContractAddress = contract_address_const::<'owner'>();
-    let beneficiary1: ContractAddress = contract_address_const::<'beneficiary1'>();
-    let beneficiary2: ContractAddress = contract_address_const::<'beneficiary2'>();
+  // Helper function to setup contract with a test plan
+  fn setup_with_plan() -> (IInheritXDispatcher, u256, ContractAddress) {
+      let (IInheritXDispatcher, contract_address) = setup();
+      let dispatcher = IInheritXDispatcher { contract_address };
+      let owner: ContractAddress = contract_address_const::<'owner'>();
+      let beneficiary1: ContractAddress = contract_address_const::<'beneficiary1'>();
+      let beneficiary2: ContractAddress = contract_address_const::<'beneficiary2'>();
 
-    // Create test plan through contract calls
-    let plan_id = dispatcher
-        .create_inheritance_plan(
-            'Test Plan',
-            array![
-                AssetAllocation { token: owner, amount: 1000, percentage: 50 },
-                AssetAllocation { token: owner, amount: 2000, percentage: 50 },
-            ],
-            'Test Description',
-            array![beneficiary1, beneficiary2],
-        );
+      // Create test plan through contract calls
+      let plan_id = dispatcher
+          .create_inheritance_plan(
+              'Test Plan',
+              array![
+                  AssetAllocation { token: owner, amount: 1000, percentage: 50 },
+                  AssetAllocation { token: owner, amount: 2000, percentage: 50 },
+              ],
+              'Test Description',
+              array![beneficiary1, beneficiary2],
+          );
 
-    // To test media messages, we would need to add a function to the contract interface
-    // that allows adding media messages with recipients. Since that doesn't exist in your
-    // current interface, we'll focus on testing the beneficiaries section which we can
-    // properly set up through create_inheritance_plan
+      // To test media messages, we would need to add a function to the contract interface
+      // that allows adding media messages with recipients. Since that doesn't exist in your
+      // current interface, we'll focus on testing the beneficiaries section which we can
+      // properly set up through create_inheritance_plan
 
-    (dispatcher, plan_id, contract_address)
-}
+      (dispatcher, plan_id, contract_address)
+  }
 
 #[test]
 fn test_get_basic_information_section() {
@@ -317,4 +319,98 @@ fn test_empty_sections() {
 
     let beneficiaries = inheritx.get_plan_section(plan_id, PlanSection::Beneficiaries);
     assert!(beneficiaries.beneficiaries.len() == 1, "Should have only 1 beneficiary");
+    }
+
+    #[test]
+    fn test_get_all_notification_preferences() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
+
+        // Check initial activity history length
+        let notification = dispatcher.get_all_notification_preferences(user);
+        // Try to retrieve history
+
+        assert(notification.email_notifications == false, 'should be false');
+        assert(notification.push_notifications == false, 'should be false');
+        assert(notification.claim_alerts == false, 'should be false');
+        assert(notification.plan_updates == false, 'should be false');
+        assert(notification.security_alerts == false, 'should be false');
+        assert(notification.marketing_updates == false, 'should be false');
+    }
+
+    #[test]
+    fn test_update_user_notification_preferences() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
+
+        // Check initial activity history length
+        let notification = dispatcher.update_notification(user, true, true, true, true, true, true);
+
+        // Try to retrieve update
+
+        assert(notification.email_notifications == true, 'should be true');
+        assert(notification.push_notifications == true, 'should be true');
+        assert(notification.claim_alerts == true, 'should be true');
+        assert(notification.plan_updates == true, 'should be true');
+        assert(notification.security_alerts == true, 'should be true');
+        assert(notification.marketing_updates == true, 'should be true');
+    }
+
+    #[test]
+    fn test_confirm_update_notification_preferences() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
+
+        // Check initial activity history length
+        let notification = dispatcher
+            .update_notification(user, false, false, false, true, true, true);
+
+        // Try to retrieve update
+
+        assert(notification.email_notifications == false, 'should be true');
+        assert(notification.push_notifications == false, 'should be true');
+        assert(notification.claim_alerts == false, 'should be true');
+        assert(notification.plan_updates == true, 'should be true');
+        assert(notification.security_alerts == true, 'should be true');
+        assert(notification.marketing_updates == true, 'should be true');
+    }
+
+    #[test]
+    fn test_confirm_user_notification_preferences() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
+        let Admin = contract_address_const::<'Admin'>();
+
+        // Check initial activity history length
+        let notification = dispatcher
+            .update_notification(Admin, true, true, false, true, false, true);
+
+        // Try to retrieve update
+
+        assert(notification.email_notifications == true, 'should be true');
+        assert(notification.push_notifications == true, 'should be true');
+        assert(notification.claim_alerts == false, 'should be true');
+        assert(notification.plan_updates == true, 'should be true');
+        assert(notification.security_alerts == false, 'should be false');
+        assert(notification.marketing_updates == true, 'should be true');
+    }
+
+    #[test]
+    fn test_event_notification_preferences() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
+
+        // Check initial activity history length
+        let notification = dispatcher
+            .update_notification(user, false, false, false, true, true, true);
+
+        // Try to retrieve update
+
+        assert(notification.email_notifications == false, 'should be true');
+        assert(notification.push_notifications == false, 'should be true');
+        assert(notification.claim_alerts == false, 'should be true');
+        assert(notification.plan_updates == true, 'should be true');
+        assert(notification.security_alerts == true, 'should be true');
+        assert(notification.marketing_updates == true, 'should be true');
+    }
 }
