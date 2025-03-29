@@ -1,8 +1,5 @@
 use starknet::ContractAddress;
-use crate::types::{
-    ActivityRecord, ActivityType, NotificationSettings, NotificationStruct, SimpleBeneficiary,
-    UserProfile,
-};
+use crate::types::{ActivityRecord, ActivityType, NotificationSettings, NotificationStruct, SimpleBeneficiary, UserProfile, MediaMessage};
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct InheritancePlan {
@@ -23,12 +20,12 @@ pub struct AssetAllocation {
     pub percentage: u8,
 }
 
-#[derive(Copy, Drop, Serde)]
-pub struct MediaMessage {
-    pub plan_id: felt252,
-    pub media_type: felt252,
-    pub media_content: felt252,
-}
+// #[derive(Copy, Drop, Serde)]
+// pub struct MediaMessage {
+//     pub plan_id: felt252,
+//     pub media_type: felt252,
+//     pub media_content: felt252,
+// }
 
 #[starknet::interface]
 pub trait IInheritX<TContractState> {
@@ -127,4 +124,12 @@ pub trait IInheritX<TContractState> {
     ) -> NotificationStruct;
 
     fn delete_user_profile(ref self: TContractState, address: ContractAddress) -> bool;
+
+    fn add_media_message(
+        ref self: TContractState,
+        plan_id: u256,
+        media_type: felt252,
+        media_content: felt252,
+    );
+    fn get_media_messages(self: @TContractState, plan_id: u256) -> Array<MediaMessage>;
 }

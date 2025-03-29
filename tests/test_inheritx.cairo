@@ -310,4 +310,67 @@ mod tests {
         assert(notification.security_alerts == true, 'should be true');
         assert(notification.marketing_updates == true, 'should be true');
     }
+
+    #[test]
+    fn test_add_and_get_media_messages() {
+        let (dispatcher, contract_address) = setup();
+        let owner = contract_address_const::<'owner'>();
+
+        start_cheat_caller_address(contract_address, owner);
+        let plan_id = dispatcher
+            .create_inheritance_plan(
+                'Test Plan',
+                array![
+                    AssetAllocation {
+                        token: contract_address_const::<123>(), amount: 100_u256, percentage: 100,
+                    },
+                ],
+                'Test Description',
+                array![contract_address_const::<456>()],
+            );
+
+        let image_type = 'image/jpeg';
+        let video_type = 'video/mp4';
+        let image_content = 'photo.jpg';
+        let video_content = 'video.mp4';
+
+        dispatcher.add_media_message(plan_id, image_type, image_content);
+        dispatcher.add_media_message(plan_id, video_type, video_content);
+
+        let messages = dispatcher.get_media_messages(plan_id);
+        assert(messages.len() == 2, 'Should return 3 messages');
+    }
+
+    #[test]
+    fn test_get_media_messages_empty() {
+        let (dispatcher, contract_address) = setup();
+        let owner = contract_address_const::<'owner'>();
+        let plan_id = 1_u256;
+
+        let messages = dispatcher.get_media_messages(plan_id);
+        assert(messages.len() == 0, 'Should return empty array');
+    }
+
+    #[test]
+    #[should_panic(expected: 'Only owner can add messages')]
+    fn test_add_media_message_unauthorized() {
+        let (dispatcher, contract_address) = setup();
+        let owner: ContractAddress = contract_address_const::<'owner'>();
+        let non_owner: ContractAddress = contract_address_const::<'stranger'>();
+        start_cheat_caller_address(contract_address, owner);
+        let plan_id = dispatcher
+            .create_inheritance_plan(
+                'Test Plan',
+                array![
+                    AssetAllocation {
+                        token: contract_address_const::<456>(), amount: 100_u256, percentage: 100,
+                    },
+                ],
+                'Test Description',
+                array![contract_address_const::<789>()],
+            );
+
+        start_cheat_caller_address(contract_address, non_owner);
+        dispatcher.add_media_message(plan_id, 'image/jpeg', 'photo.jpg');
+    }
 }
