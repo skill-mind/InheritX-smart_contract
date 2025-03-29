@@ -1,5 +1,8 @@
 use starknet::ContractAddress;
-use crate::types::{ActivityRecord, ActivityType, SimpleBeneficiary, UserProfile};
+use crate::types::{
+    ActivityRecord, ActivityType, NotificationSettings, NotificationStruct, SimpleBeneficiary,
+    UserProfile,
+};
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct InheritancePlan {
@@ -86,7 +89,14 @@ pub trait IInheritX<TContractState> {
     fn retrieve_claim(ref self: TContractState, inheritance_id: u256) -> SimpleBeneficiary;
     fn transfer_funds(ref self: TContractState, beneficiary: ContractAddress, amount: u256);
     fn test_deployment(ref self: TContractState) -> bool;
-
+    fn is_verified(self: @TContractState, user: ContractAddress) -> bool;
+    // fn generate_verification_code(ref self: TContractState, user: ContractAddress) -> felt252;
+    fn complete_verififcation(ref self: TContractState, user: ContractAddress, code: felt252);
+    fn start_verification(ref self: TContractState, user: ContractAddress) -> felt252;
+    fn check_expiry(ref self: TContractState, user: ContractAddress) -> bool;
+    fn get_verification_status(
+        ref self: TContractState, code: felt252, user: ContractAddress,
+    ) -> bool;
     fn get_activity_history(
         self: @TContractState, user: ContractAddress, start_index: u256, page_size: u256,
     ) -> Array<ActivityRecord>;
@@ -101,4 +111,21 @@ pub trait IInheritX<TContractState> {
         profile_image: felt252,
     ) -> bool;
     fn get_profile(ref self: TContractState, address: ContractAddress) -> UserProfile;
+
+    fn update_notification(
+        ref self: TContractState,
+        user: ContractAddress,
+        email_notifications: bool,
+        push_notifications: bool,
+        claim_alerts: bool,
+        plan_updates: bool,
+        security_alerts: bool,
+        marketing_updates: bool,
+    ) -> NotificationStruct;
+
+    fn get_all_notification_preferences(
+        ref self: TContractState, user: ContractAddress,
+    ) -> NotificationStruct;
+
+    fn delete_user_profile(ref self: TContractState, address: ContractAddress) -> bool;
 }
