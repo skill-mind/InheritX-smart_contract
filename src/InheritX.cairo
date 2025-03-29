@@ -77,7 +77,7 @@ pub mod InheritX {
         user: ContractAddress,
         activity_id: u256,
     }
-    //     #[derive(Copy, Drop, Serde)]
+    //     #[derive(Copy, Drop, Serde)]ze
     //  enum VerificationStatus {
     //     Unverified,
     //     PendingVerification,
