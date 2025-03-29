@@ -9,7 +9,7 @@ pub mod InheritX {
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
     use crate::types::{
         ActivityRecord, ActivityType, NotificationSettings, SecuritySettings, SimpleBeneficiary,
-        UserProfile, UserRole, VerificationStatus
+        UserProfile, UserRole, VerificationStatus,
     };
 
     #[storage]
@@ -444,28 +444,42 @@ pub mod InheritX {
             assert(status_requirement, 'Plan is not active');
 
             // Check if transfer date is reached
-            let time_requirement: bool = self.plan_transfer_date.entry(plan_id).read() <= get_block_timestamp();
+            let time_requirement: bool = self
+                .plan_transfer_date
+                .entry(plan_id)
+                .read() <= get_block_timestamp();
             assert(time_requirement, 'Transfer date not reached');
 
             // Check if inactivity period is met by asset owner
             let inactivity_period_requirement: bool = {
                 let last_active = self.plan_creation_date.entry(plan_id).read();
-                self.plan_inactivity_period.entry(plan_id).read() <= (get_block_timestamp() - last_active)
+                self
+                    .plan_inactivity_period
+                    .entry(plan_id)
+                    .read() <= (get_block_timestamp() - last_active)
             };
             assert(inactivity_period_requirement, 'Inactivity period not met');
 
             // Check if multi_signature_required is true
             //must be refactored to check if approvals are by the correct beneficiaries
-            let mut approvals_requirement : bool = true;
+            let mut approvals_requirement: bool = true;
 
             if self.plan_multi_signature_required.entry(plan_id).read() {
                 // Check if required approvals are met
-                let required_approvals = self.plan_beneficiaries_count.entry(plan_id).read() + 1; //beneficieries + owner
-                let mut approvals_requirement = self.plan_approvals_count.entry(plan_id).read() == required_approvals;
+                let required_approvals = self.plan_beneficiaries_count.entry(plan_id).read()
+                    + 1; //beneficieries + owner
+                let mut approvals_requirement = self
+                    .plan_approvals_count
+                    .entry(plan_id)
+                    .read() == required_approvals;
                 assert(approvals_requirement, 'Not enough approvals');
             }
             
-            if (valid_id && status_requirement && time_requirement && inactivity_period_requirement && approvals_requirement) {
+            if (valid_id
+                && status_requirement
+                && time_requirement
+                && inactivity_period_requirement
+                && approvals_requirement) {
                 return true;
             } else {
                 return false;
