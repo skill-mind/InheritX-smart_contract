@@ -474,7 +474,7 @@ pub mod InheritX {
                     .read() == required_approvals;
                 assert(approvals_requirement, 'Not enough approvals');
             }
-            
+
             if (valid_id
                 && status_requirement
                 && time_requirement
