@@ -3,8 +3,8 @@ pub mod InheritX {
     use core::num::traits::Zero;
     use core::traits::Into;
     use starknet::storage::{
-        Map, MutableVecTrait, StorageMapReadAccess, StorageMapWriteAccess, StoragePathEntry,
-        StoragePointerReadAccess, StoragePointerWriteAccess, Vec, VecTrait, Mutable
+        Map, Mutable, MutableVecTrait, StorageMapReadAccess, StorageMapWriteAccess,
+        StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess, Vec, VecTrait,
     };
     use starknet::{
         ContractAddress, contract_address_const, get_block_timestamp, get_caller_address,
@@ -12,9 +12,10 @@ pub mod InheritX {
     };
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
     use crate::types::{
-        ActivityRecord, ActivityType, NotificationSettings, NotificationStruct, SecuritySettings, MediaMessage
-        SimpleBeneficiary, UserProfile, UserRole, VerificationStatus,
+        ActivityRecord, ActivityType, MediaMessage, NotificationSettings, NotificationStruct,
+        SecuritySettings, SimpleBeneficiary, UserProfile, UserRole, VerificationStatus,
     };
+
 
     #[storage]
     struct Storage {
@@ -599,7 +600,7 @@ pub mod InheritX {
             // Verify caller is plan owner
             let caller = get_caller_address();
             assert(
-                caller == self.plan_asset_owner.read(plan_id), 'Only plan owner can add messages',
+                caller == self.plan_asset_owner.read(plan_id), 'Only owner can add messages',
             );
 
             // Get current message count for this plan

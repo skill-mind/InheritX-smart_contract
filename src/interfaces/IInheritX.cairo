@@ -1,5 +1,5 @@
 use starknet::ContractAddress;
-use crate::types::{ActivityRecord, ActivityType, NotificationSettings, SimpleBeneficiary, UserProfile, MediaMessage};
+use crate::types::{ActivityRecord, ActivityType, NotificationSettings, NotificationStruct, SimpleBeneficiary, UserProfile, MediaMessage};
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct InheritancePlan {
