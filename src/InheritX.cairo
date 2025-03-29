@@ -337,6 +337,25 @@ pub mod InheritX {
             self.deployed.read()
         }
 
+ feat/getTotalAsset
+ feat/getTotalAsset
+        fn get_total_assets_value(self: ContractState) -> u256 {
+            let total_plans = self.plans_id.read();
+            let mut total_value: u256 = 0;
+
+            for inheritance_id in 0..total_plans {
+                match self.funds.try_read(inheritance_id) {
+                    Some(beneficiary) => {
+                        if !beneficiary.claim_status {
+                            total_value += beneficiary.amount;
+                        }
+                    }
+                    None => continue, 
+                }
+            }
+            total_value
+
+
         fn start_verification(ref self: ContractState, user: ContractAddress) -> felt252 {
             assert(!self.verification_status.read(user), 'Already verified');
 
@@ -395,6 +414,7 @@ pub mod InheritX {
         /// @param plan_id - The ID of the plan.
         /// @param media_type - The type of media (e.g., 0 for image, 1 for video).
         /// @param media_content - The content of the media (e.g., IPFS hash or URL as felt252).
+ main
         fn add_beneficiary(
             ref self: ContractState,
             plan_id: u256,
@@ -508,6 +528,7 @@ pub mod InheritX {
 
         fn get_total_plans(self: @ContractState) -> u256 {
             self.total_plans.read()
+ main
         }
         fn update_notification(
             ref self: ContractState,
