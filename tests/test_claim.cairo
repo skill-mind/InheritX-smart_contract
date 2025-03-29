@@ -1,15 +1,10 @@
 // Import the contract modules
-use inheritx::imple::InheritXClaim::InheritxClaim;
-use inheritx::imple::InheritXPlan::InheritxPlan;
 use inheritx::interfaces::IInheritX::{IInheritX, IInheritXDispatcher, IInheritXDispatcherTrait};
-use snforge_std::{ContractClassTrait, DeclareResultTrait, declare};
+use snforge_std::{CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_caller_address, declare};
 use starknet::ContractAddress;
 use starknet::class_hash::ClassHash;
 use starknet::contract_address::contract_address_const;
 use starknet::testing::{set_caller_address, set_contract_address};
-use snforge_std::{cheat_caller_address, CheatSpan};
-
-
 
 fn setup() -> ContractAddress {
     let declare_result = declare("InheritX");
@@ -48,7 +43,7 @@ fn test_create_claim() {
 
     // Test input values
     let name: felt252 = 'John';
-    let email: felt252 = 'John@yahoo.com'; 
+    let email: felt252 = 'John@yahoo.com';
     let personal_message = 'i love you my son';
     let claim_code = 2563;
 
@@ -56,7 +51,8 @@ fn test_create_claim() {
     cheat_caller_address(contract_address, benefactor, CheatSpan::Indefinite);
 
     // Call create_claim
-    let claim_id = dispatcher.create_claim(name, email, beneficiary, personal_message, 1000, claim_code);
+    let claim_id = dispatcher
+        .create_claim(name, email, beneficiary, personal_message, 1000, claim_code);
 
     // Validate that the claim ID is correctly incremented
     assert(claim_id == 0, 'claim ID should start from 0');
@@ -82,7 +78,7 @@ fn test_collect_claim() {
 
     // Test input values
     let name: felt252 = 'John';
-    let email: felt252 = 'John@yahoo.com'; 
+    let email: felt252 = 'John@yahoo.com';
     let personal_message = 'i love you my son';
     let claim_code = 2563;
 
@@ -90,15 +86,16 @@ fn test_collect_claim() {
     cheat_caller_address(contract_address, benefactor, CheatSpan::Indefinite);
 
     // Call create_claim
-    let claim_id = dispatcher.create_claim(name, email, beneficiary, personal_message, 1000, claim_code);
+    let claim_id = dispatcher
+        .create_claim(name, email, beneficiary, personal_message, 1000, claim_code);
 
     // Validate that the claim ID is correctly incremented
     assert(claim_id == 0, 'claim ID should start from 0');
     cheat_caller_address(contract_address, beneficiary, CheatSpan::Indefinite);
 
-  let success = dispatcher.collect_claim(0, beneficiary, 2563);
+    let success = dispatcher.collect_claim(0, beneficiary, 2563);
 
-  assert(success, 'Claim unsuccessful');
+    assert(success, 'Claim unsuccessful');
 }
 
 #[test]
@@ -112,7 +109,7 @@ fn test_collect_claim_with_wrong_address() {
 
     // Test input values
     let name: felt252 = 'John';
-    let email: felt252 = 'John@yahoo.com'; 
+    let email: felt252 = 'John@yahoo.com';
     let personal_message = 'i love you my son';
     let claim_code = 2563;
 
@@ -120,15 +117,16 @@ fn test_collect_claim_with_wrong_address() {
     cheat_caller_address(contract_address, benefactor, CheatSpan::Indefinite);
 
     // Call create_claim
-    let claim_id = dispatcher.create_claim(name, email, beneficiary, personal_message, 1000, claim_code);
+    let claim_id = dispatcher
+        .create_claim(name, email, beneficiary, personal_message, 1000, claim_code);
 
     // Validate that the claim ID is correctly incremented
     assert(claim_id == 0, 'claim ID should start from 0');
     cheat_caller_address(contract_address, beneficiary, CheatSpan::Indefinite);
 
-  let success = dispatcher.collect_claim(0, malicious, 2563);
+    let success = dispatcher.collect_claim(0, malicious, 2563);
 
-  assert(success, 'Claim unsuccessful');
+    assert(success, 'Claim unsuccessful');
 }
 
 #[test]
@@ -142,7 +140,7 @@ fn test_collect_claim_with_wrong_code() {
 
     // Test input values
     let name: felt252 = 'John';
-    let email: felt252 = 'John@yahoo.com'; 
+    let email: felt252 = 'John@yahoo.com';
     let personal_message = 'i love you my son';
     let claim_code = 2563;
 
@@ -150,17 +148,16 @@ fn test_collect_claim_with_wrong_code() {
     cheat_caller_address(contract_address, benefactor, CheatSpan::Indefinite);
 
     // Call create_claim
-    let claim_id = dispatcher.create_claim(name, email, beneficiary, personal_message, 1000, claim_code);
+    let claim_id = dispatcher
+        .create_claim(name, email, beneficiary, personal_message, 1000, claim_code);
 
     // Validate that the claim ID is correctly incremented
     assert(claim_id == 0, 'claim ID should start from 0');
     cheat_caller_address(contract_address, beneficiary, CheatSpan::Indefinite);
 
-  let success = dispatcher.collect_claim(0, beneficiary, 63);
+    let success = dispatcher.collect_claim(0, beneficiary, 63);
 
-  assert(success, 'Claim unsuccessful');
-
-  
+    assert(success, 'Claim unsuccessful');
 }
 
 #[test]
@@ -174,7 +171,7 @@ fn test_collect_claim_twice() {
 
     // Test input values
     let name: felt252 = 'John';
-    let email: felt252 = 'John@yahoo.com'; 
+    let email: felt252 = 'John@yahoo.com';
     let personal_message = 'i love you my son';
     let claim_code = 2563;
 
@@ -182,15 +179,94 @@ fn test_collect_claim_twice() {
     cheat_caller_address(contract_address, benefactor, CheatSpan::Indefinite);
 
     // Call create_claim
-    let claim_id = dispatcher.create_claim(name, email, beneficiary, personal_message, 1000, claim_code);
+    let claim_id = dispatcher
+        .create_claim(name, email, beneficiary, personal_message, 1000, claim_code);
 
     // Validate that the claim ID is correctly incremented
     assert(claim_id == 0, 'claim ID should start from 0');
     cheat_caller_address(contract_address, beneficiary, CheatSpan::Indefinite);
 
-  let success = dispatcher.collect_claim(0, beneficiary, 2563);
+    let success = dispatcher.collect_claim(0, beneficiary, 2563);
 
-  assert(success, 'Claim unsuccessful');
+    assert(success, 'Claim unsuccessful');
 
-  let success2 = dispatcher.collect_claim(0, beneficiary, 2563);
+    let success2 = dispatcher.collect_claim(0, beneficiary, 2563);
+}
+
+
+#[test]
+fn test_collect_create_profile() {
+    let contract_address = setup();
+    let dispatcher = IInheritXDispatcher { contract_address };
+    let caller: ContractAddress = contract_address_const::<'benefactor'>();
+
+    // Test input values
+    let username: felt252 = 'John1234';
+    let email: felt252 = 'John@yahoo.com';
+    let fullname = 'John Doe';
+    let image = 'image';
+
+    // Ensure the caller is the admin
+    cheat_caller_address(contract_address, caller, CheatSpan::Indefinite);
+
+    // Call create_claim
+    let claim_id = dispatcher.create_profile(username, email, fullname, image);
+
+    // Validate that the claim ID is correctly incremented
+
+    cheat_caller_address(contract_address, caller, CheatSpan::Indefinite);
+
+    let new_profile = dispatcher.get_profile(caller);
+
+    assert(new_profile.username == username, 'Wrong Username');
+    assert(new_profile.email == email, ' Wrong email');
+    assert(new_profile.full_name == fullname, ' Wrong fullname');
+    assert(new_profile.profile_image == image, ' Wrong image');
+    assert(new_profile.address == caller, ' Wrong Owner');
+}
+
+#[test]
+fn test_get_total_assets_value() {
+    // Step 1: Deploy the contract
+    let mut contract = InheritX::deploy();
+
+    // Step 2: Set up sample inheritance plans
+    let beneficiary_1 = ContractAddress::from(0x123); 
+    let beneficiary_2 = ContractAddress::from(0x456);
+
+    // Simulate adding inheritance plans
+    let inheritance_1 = SimpleBeneficiary {
+        id: 0,
+        name: 12345,
+        email: 67890,
+        wallet_address: beneficiary_1,
+        personal_message: 99999,
+        amount: 100,
+        code: 5555,
+        claim_status: false, // Not yet claimed
+        benefactor: ContractAddress::from(0x999),
+    };
+
+    let inheritance_2 = SimpleBeneficiary {
+        id: 1,
+        name: 54321,
+        email: 98760,
+        wallet_address: beneficiary_2,
+        personal_message: 88888,
+        amount: 200,
+        code: 6666,
+        claim_status: true, // Already claimed
+        benefactor: ContractAddress::from(0x999),
+    };
+
+    // Step 3: Store these beneficiaries in the contract
+    contract.funds.write(0, inheritance_1);
+    contract.funds.write(1, inheritance_2);
+    contract.plans_id.write(2); // 2 total plans created
+
+    // Step 4: Call the function to check unclaimed assets
+    let total_value = contract.get_total_assets_value();
+
+    // Step 5: Assert that only unclaimed funds are counted (100)
+    assert_eq!(total_value, 100);
 }
