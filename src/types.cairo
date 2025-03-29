@@ -66,7 +66,7 @@ pub struct PlanConditions {
 //     upload_date: u64,
 // }
 
-#[derive(Copy, Drop, Serde)]
+#[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct MediaMessage {
     pub plan_id: u256,
     pub media_type: felt252,
@@ -241,4 +241,13 @@ pub struct ActivityRecord {
     pub details: felt252,
     pub ip_address: felt252,
     pub device_info: felt252,
+}
+#[derive(Copy, Drop, Serde, starknet::Store)]
+pub struct NotificationStruct {
+    pub email_notifications: bool,
+    pub push_notifications: bool,
+    pub claim_alerts: bool,
+    pub plan_updates: bool,
+    pub security_alerts: bool,
+    pub marketing_updates: bool,
 }
