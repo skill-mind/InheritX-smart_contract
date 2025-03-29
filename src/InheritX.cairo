@@ -43,6 +43,9 @@ pub mod InheritX {
         plan_total_value: Map<u256, u256>,
         plan_beneficiaries_count: Map<u256, u32>,
         plan_beneficiaries: Map<(u256, u32), ContractAddress>,
+        plan_inactivity_period: Map<u256, u64>,
+        plan_multi_signature_required: Map<u256, bool>,
+        plan_approvals_count: Map<u256, u32>,
         is_beneficiary: Map<(u256, ContractAddress), bool>,
         user_activities: Map<ContractAddress, Map<u256, ActivityRecord>>,
         user_activities_pointer: Map<ContractAddress, u256>,
@@ -162,6 +165,7 @@ pub mod InheritX {
             self.plan_asset_owner.write(plan_id, get_caller_address());
             self.plan_creation_date.write(plan_id, get_block_timestamp());
             self.plan_total_value.write(plan_id, total_value);
+            self.plan_inactivity_period.write(plan_id, 1000);
 
             let new_plan = InheritancePlan {
                 owner: get_caller_address(),
@@ -509,6 +513,45 @@ pub mod InheritX {
         fn get_total_plans(self: @ContractState) -> u256 {
             self.total_plans.read()
         }
+
+
+        fn can_execute_plan(self: @ContractState, plan_id: u256) -> bool {
+            // Check if id is valid
+            let valid_id = plan_id < self.total_plans.read();
+            assert(valid_id, 'Invalid plan ID');
+
+            // Check if plan is in Active status
+            let status_requirement = self.inheritance_plans.entry(plan_id).read().is_active == true;
+            assert(status_requirement, 'Plan is not active');
+
+            // Check if transfer date is reached
+            let time_requirement: bool = self.plan_transfer_date.entry(plan_id).read() <= get_block_timestamp();
+            assert(time_requirement, 'Transfer date not reached');
+
+            // Check if inactivity period is met by asset owner
+            let inactivity_period_requirement: bool = {
+                let last_active = self.plan_creation_date.entry(plan_id).read();
+                self.plan_inactivity_period.entry(plan_id).read() <= (get_block_timestamp() - last_active)
+            };
+            assert(inactivity_period_requirement, 'Inactivity period not met');
+
+            // Check if multi_signature_required is true
+            //must be refactored to check if approvals are by the correct beneficiaries
+            let mut approvals_requirement : bool = true;
+
+            if self.plan_multi_signature_required.entry(plan_id).read() {
+                // Check if required approvals are met
+                let required_approvals = self.plan_beneficiaries_count.entry(plan_id).read() + 1; //beneficieries + owner
+                let mut approvals_requirement = self.plan_approvals_count.entry(plan_id).read() == required_approvals;
+                assert(approvals_requirement, 'Not enough approvals');
+            }
+            
+            if (valid_id && status_requirement && time_requirement && inactivity_period_requirement && approvals_requirement) {
+                return true;
+            } else {
+                return false;
+            }
+
         fn update_notification(
             ref self: ContractState,
             user: ContractAddress,
@@ -578,6 +621,7 @@ pub mod InheritX {
             self.user_profiles.write(caller, user);
 
             true
+
         }
     }
 }
