@@ -524,5 +524,29 @@ pub mod InheritX {
 
             true
         }
+
+        fn complete_recovery(
+            ref self: ContractState,
+            user: ContractAddress,
+            recovery_code: felt252,
+        ) -> bool {
+            // Validate recovery code
+            let stored_code = self.verification_code.read(user);
+            assert(stored_code == recovery_code, 'Invalid recovery code');
+
+            // Check expiry
+            let expiry = self.verification_expiry.read(user);
+            assert(get_block_timestamp() < expiry, 'Recovery code expired');
+
+            // Restore account access
+            self.verification_status.write(user, true);
+
+            // Clear recovery data
+            self.verification_code.write(user, 0);
+            self.verification_expiry.write(user, 0);
+            self.verification_attempts.write(user, 0);
+
+            true
+        }
     }
 }

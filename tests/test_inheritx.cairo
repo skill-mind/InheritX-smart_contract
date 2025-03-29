@@ -217,4 +217,50 @@ mod tests {
         ];
         dispatcher.create_inheritance_plan(plan_name, assets, description, pick_beneficiaries);
     }
+
+    #[test]
+    fn test_complete_recovery_success() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
+
+        // Start recovery process
+        let recovery_code = dispatcher.start_verification(user);
+
+        // Complete recovery
+        let success = dispatcher.complete_recovery(user, recovery_code);
+        assert(success, 'Recovery should succeed');
+
+        // Verify account is restored
+        let is_verified = dispatcher.is_verified(user);
+        assert(is_verified, 'User should be verified after recovery');
+    }
+
+    #[test]
+    #[should_panic(expected: 'Invalid recovery code')]
+    fn test_complete_recovery_invalid_code() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
+
+        // Start recovery process
+        dispatcher.start_verification(user);
+
+        // Attempt recovery with invalid code
+        dispatcher.complete_recovery(user, 999999);
+    }
+
+    #[test]
+    #[should_panic(expected: 'Recovery code expired')]
+    fn test_complete_recovery_expired_code() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
+
+        // Start recovery process
+        dispatcher.start_verification(user);
+
+        // Simulate code expiry
+        cheat_block_timestamp(get_block_timestamp() + 601);
+
+        // Attempt recovery
+        dispatcher.complete_recovery(user, 123456);
+    }
 }
