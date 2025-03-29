@@ -161,16 +161,17 @@ pub mod InheritX {
         fn get_total_assets_value(self: ContractState) -> u256 {
             let total_plans = self.plans_id.read();
             let mut total_value: u256 = 0;
-            let mut current_id: u256 = 0;
 
-            while current_id < total_plans {
-                let beneficiary = self.funds.read(current_id);
-                if !beneficiary.claim_status {
-                    total_value = total_value + beneficiary.amount;
+            for inheritance_id in 0..total_plans {
+                match self.funds.try_read(inheritance_id) {
+                    Some(beneficiary) => {
+                        if !beneficiary.claim_status {
+                            total_value += beneficiary.amount;
+                        }
+                    }
+                    None => continue, 
                 }
-                current_id = current_id + 1;
-            };
-
+            }
             total_value
         }
     }
