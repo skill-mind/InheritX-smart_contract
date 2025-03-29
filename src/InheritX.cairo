@@ -3,8 +3,8 @@ pub mod InheritX {
     use core::num::traits::Zero;
     use core::traits::Into;
     use starknet::storage::{
-        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePathEntry,
-        StoragePointerReadAccess, StoragePointerWriteAccess,
+        Map, MutableVecTrait, StorageMapReadAccess, StorageMapWriteAccess, StoragePathEntry,
+        StoragePointerReadAccess, StoragePointerWriteAccess, Vec, VecTrait, Mutable
     };
     use starknet::{
         ContractAddress, contract_address_const, get_block_timestamp, get_caller_address,
@@ -12,8 +12,8 @@ pub mod InheritX {
     };
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
     use crate::types::{
-        ActivityRecord, ActivityType, NotificationSettings, SecuritySettings, SimpleBeneficiary,
-        UserProfile, UserRole, VerificationStatus,
+        ActivityRecord, ActivityType, MediaMessage, NotificationSettings, SecuritySettings,
+        SimpleBeneficiary, UserProfile, UserRole, VerificationStatus,
     };
 
 
@@ -65,6 +65,8 @@ pub mod InheritX {
         verification_attempts: Map<ContractAddress, u8>,
         verification_expiry: Map<ContractAddress, u64>,
         user_profiles: Map<ContractAddress, UserProfile>,
+        media_message_count: Map<u256, u32>,
+        media_messages: Map<(u256, u32), MediaMessage>,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -137,7 +139,7 @@ pub mod InheritX {
                 let asset = tokens.at(i);
                 total_value += *asset.amount;
                 i += 1;
-            };
+            }
 
             // Generate new plan ID
             let plan_id = self.plans_id.read();
@@ -169,7 +171,7 @@ pub mod InheritX {
                 self.plan_assets.write((plan_id, asset_index), *tokens.at(i));
                 asset_index += 1;
                 i += 1;
-            };
+            }
             self.plan_asset_count.write(plan_id, asset_count.try_into().unwrap());
 
             // Store beneficiaries
@@ -181,7 +183,7 @@ pub mod InheritX {
                 self.is_beneficiary.write((plan_id, beneficiary), true);
                 beneficiary_index += 1;
                 i += 1;
-            };
+            }
             self.plan_beneficiaries_count.write(plan_id, beneficiary_count);
 
             // Update protocol statistics
@@ -198,7 +200,7 @@ pub mod InheritX {
                 let asset = tokens.at(i);
                 self.transfer_funds(get_contract_address(), *asset.amount);
                 i += 1;
-            };
+            }
 
             // Return the plan ID
             plan_id
@@ -276,6 +278,7 @@ pub mod InheritX {
             self.funds.write(inheritance_id, claim);
             true
         }
+
         fn get_inheritance_plan(ref self: ContractState, plan_id: u256) -> InheritancePlan {
             self.inheritance_plans.read(plan_id)
         }
@@ -340,6 +343,7 @@ pub mod InheritX {
             // send code to user via SMS or email
             code
         }
+
         fn check_expiry(ref self: ContractState, user: ContractAddress) -> bool {
             let expiry = self.verification_expiry.read(user);
             assert(get_block_timestamp() < expiry, 'Code expired');
@@ -479,13 +483,13 @@ pub mod InheritX {
             loop {
                 if current_index > end_index {
                     break;
-                };
+                }
 
                 let record = self.user_activities.entry(user).entry(current_index).read();
                 activity_history.append(record);
 
                 current_index += 1;
-            };
+            }
 
             activity_history
         }
@@ -523,6 +527,59 @@ pub mod InheritX {
             self.user_profiles.write(caller, user);
 
             true
+        }
+        /// Adds a media message to a specific plan
+        /// @param plan_id - The ID of the plan
+        /// @param media_type - Type of media (e.g., "image", "video")
+        /// @param media_content - Content reference (e.g., IPFS hash)
+        fn add_media_message(
+            ref self: ContractState, plan_id: u256, media_type: felt252, media_content: felt252,
+        ) {
+            // Verify plan exists
+            assert(
+                self.plan_asset_owner.read(plan_id) != contract_address_const::<0>(),
+                'Plan does not exist',
+            );
+
+            // Verify caller is plan owner
+            let caller = get_caller_address();
+            assert(
+                caller == self.plan_asset_owner.read(plan_id), 'Only plan owner can add messages',
+            );
+
+            // Get current message count for this plan
+            let message_count = self.media_message_count.read(plan_id);
+
+            // Create new media message
+            let new_message = MediaMessage { plan_id, media_type, media_content };
+
+            // Store the message
+            self.media_messages.write((plan_id, message_count), new_message);
+            self.media_message_count.write(plan_id, message_count + 1);
+        }
+
+        /// Retrieves all media messages for a specific plan
+        /// @param plan_id - The ID of the plan
+        /// @return Array of MediaMessage objects
+        fn get_media_messages(self: @ContractState, plan_id: u256) -> Array<MediaMessage> {
+            let message_count = self.media_message_count.read(plan_id);
+            let mut messages = ArrayTrait::new();
+
+            if message_count == 0 {
+                return messages;
+            }
+
+            let mut i: u32 = 0;
+            loop {
+                if i >= message_count {
+                    break;
+                }
+                let message = self.media_messages.read((plan_id, i));
+                messages.append(message);
+                i += 1;
+            }
+
+            messages
         }
     }
 }

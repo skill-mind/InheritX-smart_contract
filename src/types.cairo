@@ -56,14 +56,21 @@ pub struct PlanConditions {
     required_approvals: u8,
 }
 
-#[derive(Drop, Serde)]
+// #[derive(Drop, Serde)]
+// pub struct MediaMessage {
+//     file_hash: felt252,
+//     file_name: felt252,
+//     file_type: felt252,
+//     file_size: u64,
+//     recipients: Array<ContractAddress>,
+//     upload_date: u64,
+// }
+
+#[derive(Copy, Drop, Serde)]
 pub struct MediaMessage {
-    file_hash: felt252,
-    file_name: felt252,
-    file_type: felt252,
-    file_size: u64,
-    recipients: Array<ContractAddress>,
-    upload_date: u64,
+    pub plan_id: u256,
+    pub media_type: felt252,
+    pub media_content: felt252,
 }
 
 #[derive(Copy, Drop, Serde)]
