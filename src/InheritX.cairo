@@ -564,6 +564,7 @@ pub mod InheritX {
             } else {
                 return false;
             }
+        }
 
         fn update_notification(
             ref self: ContractState,
@@ -634,7 +635,6 @@ pub mod InheritX {
             self.user_profiles.write(caller, user);
 
             true
-
         }
     }
 }

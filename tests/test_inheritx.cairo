@@ -6,12 +6,9 @@ mod tests {
     };
     use inheritx::types::ActivityType;
     use snforge_std::{
-        
-    CheatSpan, ContractClassTrait, DeclareResultTrait, EventSpyAssertionsTrait,
-        cheat_block_timestamp, cheat_caller_address,
-    declare,
-, spy_events, start_cheat_caller_address,
-        stop_cheat_caller_address,
+        CheatSpan, ContractClassTrait, DeclareResultTrait, EventSpyAssertionsTrait,
+        cheat_block_timestamp, cheat_caller_address, declare, spy_events,
+        start_cheat_caller_address, stop_cheat_caller_address,
     };
     use starknet::class_hash::ClassHash;
     use starknet::testing::{set_caller_address, set_contract_address};
@@ -146,79 +143,79 @@ mod tests {
         // Should panic with zero page size
         dispatcher.get_activity_history(user, 0, 0);
     }
-fn setup_plan() -> (IInheritXDispatcher, u256) {
-    let dispatcher = setup();
-    let benefactor: ContractAddress = contract_address_const::<'benefactor'>();
-    let beneficiary: ContractAddress = contract_address_const::<'beneficiary'>();
-    let pick_beneficiaries: Array<ContractAddress> = array![beneficiary];
-    let assets: Array<AssetAllocation> = array![
-        AssetAllocation { token: benefactor, amount: 1000, percentage: 50 },
-        AssetAllocation { token: beneficiary, amount: 1000, percentage: 50 },
-    ];
-    let plan_name: felt252 = 'plan1';
-    let description: felt252 = 'plan_desc';
+    fn setup_plan() -> (IInheritXDispatcher, u256) {
+        let (dispatcher, _) = setup();
+        let benefactor: ContractAddress = contract_address_const::<'benefactor'>();
+        let beneficiary: ContractAddress = contract_address_const::<'beneficiary'>();
+        let pick_beneficiaries: Array<ContractAddress> = array![beneficiary];
+        let assets: Array<AssetAllocation> = array![
+            AssetAllocation { token: benefactor, amount: 1000, percentage: 50 },
+            AssetAllocation { token: beneficiary, amount: 1000, percentage: 50 },
+        ];
+        let plan_name: felt252 = 'plan1';
+        let description: felt252 = 'plan_desc';
 
-    // Ensure the caller is the admin
-    cheat_caller_address(dispatcher.contract_address, benefactor, CheatSpan::Indefinite);
+        // Ensure the caller is the admin
+        cheat_caller_address(dispatcher.contract_address, benefactor, CheatSpan::Indefinite);
 
-    // Call create_inheritance_plan
-    let plan_id = dispatcher
-        .create_inheritance_plan(plan_name, assets, description, pick_beneficiaries);
+        // Call create_inheritance_plan
+        let plan_id = dispatcher
+            .create_inheritance_plan(plan_name, assets, description, pick_beneficiaries);
 
-    (dispatcher, plan_id)
-}
+        (dispatcher, plan_id)
+    }
 
-#[test]
-fn test_can_execute_plan_success() {
-    let (dispatcher, plan_id) = setup_plan();
-    cheat_block_timestamp(dispatcher.contract_address, 1001, CheatSpan::TargetCalls(1));
-    let result = dispatcher.can_execute_plan(plan_id);
-    assert(result == true, 'should return success');
-}
+    #[test]
+    fn test_can_execute_plan_success() {
+        let (dispatcher, plan_id) = setup_plan();
+        cheat_block_timestamp(dispatcher.contract_address, 1001, CheatSpan::TargetCalls(1));
+        let result = dispatcher.can_execute_plan(plan_id);
+        assert(result == true, 'should return success');
+    }
 
-#[test]
-#[should_panic(expected: 'Invalid plan ID')]
-fn test_can_execute_plan_invalid_id() {
-    let (dispatcher, plan_id) = setup_plan();
-    cheat_block_timestamp(dispatcher.contract_address, 1001, CheatSpan::TargetCalls(1));
-    let result = dispatcher.can_execute_plan(plan_id + 1);
-    assert(result == false, 'plan ID should be invalid');
-}
+    #[test]
+    #[should_panic(expected: 'Invalid plan ID')]
+    fn test_can_execute_plan_invalid_id() {
+        let (dispatcher, plan_id) = setup_plan();
+        cheat_block_timestamp(dispatcher.contract_address, 1001, CheatSpan::TargetCalls(1));
+        let result = dispatcher.can_execute_plan(plan_id + 1);
+        assert(result == false, 'plan ID should be invalid');
+    }
 
-// #[test]
-// #[should_panic(expected: 'Plan is not active')]
-// fn test_can_execute_plan_inactive_plan(){
-//     let (dispatcher, plan_id) = setup_plan();
-//     dispatcher.set_plan_status(plan_id, false);
-//     cheat_block_timestamp(dispatcher.contract_address, 1001, CheatSpan::TargetCalls(1));
-//     let result = dispatcher.can_execute_plan(plan_id);
-//     assert(result == false, 'plan ID should be invalid');
+    // #[test]
+    // #[should_panic(expected: 'Plan is not active')]
+    // fn test_can_execute_plan_inactive_plan(){
+    //     let (dispatcher, plan_id) = setup_plan();
+    //     dispatcher.set_plan_status(plan_id, false);
+    //     cheat_block_timestamp(dispatcher.contract_address, 1001, CheatSpan::TargetCalls(1));
+    //     let result = dispatcher.can_execute_plan(plan_id);
+    //     assert(result == false, 'plan ID should be invalid');
 
-// }
+    // }
 
-#[test]
-#[should_panic(expected: 'Transfer date not reached')]
-fn test_can_execute_plan_date_not_reached() {
-    let (dispatcher, plan_id) = setup_plan();
-    dispatcher.set_plan_transfer_date(plan_id, 2000);
-    cheat_block_timestamp(dispatcher.contract_address, 1001, CheatSpan::TargetCalls(1));
-    let result = dispatcher.can_execute_plan(plan_id);
-    assert(result == false, 'date should not be reached');
-}
+    #[test]
+    #[should_panic(expected: 'Transfer date not reached')]
+    fn test_can_execute_plan_date_not_reached() {
+        let (dispatcher, plan_id) = setup_plan();
+        dispatcher.set_plan_transfer_date(plan_id, 2000);
+        cheat_block_timestamp(dispatcher.contract_address, 1001, CheatSpan::TargetCalls(1));
+        let result = dispatcher.can_execute_plan(plan_id);
+        assert(result == false, 'date should not be reached');
+    }
 
-#[test]
-#[should_panic(expected: 'Inactivity period not met')]
-fn test_can_execute_plan_period_not_met() {
-    let (dispatcher, plan_id) = setup_plan();
-    cheat_block_timestamp(dispatcher.contract_address, 900, CheatSpan::TargetCalls(1));
-    let result = dispatcher.can_execute_plan(plan_id);
-    assert(result == false, 'date should not be reached');
-}
-// #[test]
-// #[should_panic(expected:'Not enough approvals')]
-// fn test_can_execute_plan_not_approved(){
+    #[test]
+    #[should_panic(expected: 'Inactivity period not met')]
+    fn test_can_execute_plan_period_not_met() {
+        let (dispatcher, plan_id) = setup_plan();
+        cheat_block_timestamp(dispatcher.contract_address, 900, CheatSpan::TargetCalls(1));
+        let result = dispatcher.can_execute_plan(plan_id);
+        assert(result == false, 'date should not be reached');
+    }
+    // #[test]
+    // #[should_panic(expected:'Not enough approvals')]
+    // fn test_can_execute_plan_not_approved(){
 
-// }
+    // }
 
     #[test]
     fn test_initial_data() {
