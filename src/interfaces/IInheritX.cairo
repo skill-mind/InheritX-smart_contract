@@ -88,6 +88,12 @@ pub trait IInheritX<TContractState> {
     fn retrieve_claim(ref self: TContractState, inheritance_id: u256) -> SimpleBeneficiary;
     fn transfer_funds(ref self: TContractState, beneficiary: ContractAddress, amount: u256);
     fn test_deployment(ref self: TContractState) -> bool;
+ feat/getTotalActivity
+    fn get_total_assets_value(self: @TContractState) -> u256;
+}
+
+
+
     fn is_verified(self: @TContractState, user: ContractAddress) -> bool;
     // fn generate_verification_code(ref self: TContractState, user: ContractAddress) -> felt252;
     fn complete_verififcation(ref self: TContractState, user: ContractAddress, code: felt252);
@@ -96,9 +102,12 @@ pub trait IInheritX<TContractState> {
     fn get_verification_status(
         ref self: TContractState, code: felt252, user: ContractAddress,
     ) -> bool;
+ main
     fn get_activity_history(
         self: @TContractState, user: ContractAddress, start_index: u256, page_size: u256,
     ) -> Array<ActivityRecord>;
+
+    fn get_total_activities(self: @ContractState) -> u64
 
     fn get_activity_history_length(self: @TContractState, user: ContractAddress) -> u256;
     fn get_total_plans(self: @TContractState) -> u256;
@@ -110,6 +119,10 @@ pub trait IInheritX<TContractState> {
         profile_image: felt252,
     ) -> bool;
     fn get_profile(ref self: TContractState, address: ContractAddress) -> UserProfile;
+ feat/getTotalActivity
+ feat/getTotalActivity
+ main
+
 
     fn update_notification(
         ref self: TContractState,
@@ -125,6 +138,8 @@ pub trait IInheritX<TContractState> {
     fn get_all_notification_preferences(
         ref self: TContractState, user: ContractAddress,
     ) -> NotificationStruct;
+ main
 
     fn delete_user_profile(ref self: TContractState, address: ContractAddress) -> bool;
+ main
 }

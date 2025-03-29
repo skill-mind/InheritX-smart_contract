@@ -18,6 +18,7 @@ pub mod InheritX {
 
     #[storage]
     struct Storage {
+        total_activities: u64,
         admin: ContractAddress,
         security_contract: ContractAddress,
         plan_contract: ContractAddress,
@@ -119,6 +120,7 @@ pub mod InheritX {
         self.max_timelock.write(31536000);
         self.total_plans.write(0);
         self.active_plans.write(0);
+        self.total_activities.write(0);
         self.claimed_plans.write(0);
         self.total_value_locked.write(0);
         self.total_fees_collected.write(0);
@@ -304,11 +306,20 @@ pub mod InheritX {
             let user_activities = self.user_activities.entry(user);
             let current_pointer = self.user_activities_pointer.entry(user).read();
             let record = ActivityRecord {
-                timestamp: get_block_timestamp(), activity_type, details, ip_address, device_info,
+                timestamp: get_block_timestamp(), 
+                activity_type, 
+                details, 
+                ip_address, 
+                device_info,
             };
             let next_pointer = current_pointer + 1;
             user_activities.entry(next_pointer).write(record);
             self.user_activities_pointer.entry(user).write(next_pointer);
+            
+            // Increment total activities counter
+            let current_total = self.total_activities.read();
+            self.total_activities.write(current_total + 1);
+            
             self.emit(ActivityRecordEvent { user, activity_id: next_pointer });
             next_pointer
         }
@@ -317,6 +328,10 @@ pub mod InheritX {
             ref self: ContractState, user: ContractAddress, activity_id: u256,
         ) -> ActivityRecord {
             self.user_activities.entry(user).entry(activity_id).read()
+        }
+
+        fn get_total_activities(self: @ContractState) -> u64 {
+            self.total_activities.read()
         }
 
         fn get_profile(ref self: ContractState, address: ContractAddress) -> UserProfile {
@@ -336,6 +351,25 @@ pub mod InheritX {
         fn test_deployment(ref self: ContractState) -> bool {
             self.deployed.read()
         }
+
+ feat/getTotalActivity
+ feat/getTotalAsset
+        fn get_total_assets_value(self: ContractState) -> u256 {
+            let total_plans = self.plans_id.read();
+            let mut total_value: u256 = 0;
+
+            for inheritance_id in 0..total_plans {
+                match self.funds.try_read(inheritance_id) {
+                    Some(beneficiary) => {
+                        if !beneficiary.claim_status {
+                            total_value += beneficiary.amount;
+                        }
+                    }
+                    None => continue, 
+                }
+            }
+            total_value
+
 
         fn start_verification(ref self: ContractState, user: ContractAddress) -> felt252 {
             assert(!self.verification_status.read(user), 'Already verified');
@@ -395,6 +429,7 @@ pub mod InheritX {
         /// @param plan_id - The ID of the plan.
         /// @param media_type - The type of media (e.g., 0 for image, 1 for video).
         /// @param media_content - The content of the media (e.g., IPFS hash or URL as felt252).
+ main
         fn add_beneficiary(
             ref self: ContractState,
             plan_id: u256,
@@ -508,6 +543,7 @@ pub mod InheritX {
 
         fn get_total_plans(self: @ContractState) -> u256 {
             self.total_plans.read()
+ main
         }
         fn update_notification(
             ref self: ContractState,
