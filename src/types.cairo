@@ -1,5 +1,4 @@
 use starknet::ContractAddress;
-use starknet::storage::{MutableVecTrait, Vec, VecTrait};
 use crate::InheritX::InheritX::MediaMessageResponse;
 
 #[derive(Drop, Serde)]
@@ -164,6 +163,7 @@ pub struct WalletInfo {
 pub enum NotificationSettings {
     #[default]
     Default,
+    Nil,
     email_notifications,
     push_notifications,
     claim_alerts,
@@ -175,6 +175,7 @@ pub enum NotificationSettings {
 #[derive(Drop, Serde, starknet::Store, Default)]
 pub enum SecuritySettings {
     #[default]
+    Nil,
     Two_factor_enabled,
     recovery_email,
     backup_guardians,
@@ -186,6 +187,7 @@ pub enum SecuritySettings {
 #[derive(Drop, Serde, starknet::Store, Default)]
 pub enum VerificationStatus {
     #[default]
+    Nil,
     Unverified,
     PendingVerification,
     Verified,
@@ -239,4 +241,3 @@ pub struct ActivityRecord {
     pub ip_address: felt252,
     pub device_info: felt252,
 }
-
