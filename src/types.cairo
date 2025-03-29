@@ -166,11 +166,12 @@ pub enum NotificationSettings {
     marketing_updates,
 }
 
-#[derive(Drop, Serde, starknet::Store, Default)]
+#[derive(Drop, Serde, starknet::Store, Default, PartialEq)]
 pub enum SecuritySettings {
     #[default]
     Nil,
     Two_factor_enabled,
+    Two_factor_disabled,
     recovery_email,
     backup_guardians,
     auto_lock_period,
