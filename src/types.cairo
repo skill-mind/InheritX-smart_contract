@@ -157,6 +157,7 @@ pub struct WalletInfo {
 pub enum NotificationSettings {
     #[default]
     Default,
+    Nil,
     email_notifications,
     push_notifications,
     claim_alerts,
@@ -168,6 +169,7 @@ pub enum NotificationSettings {
 #[derive(Drop, Serde, starknet::Store, Default)]
 pub enum SecuritySettings {
     #[default]
+    Nil,
     Two_factor_enabled,
     recovery_email,
     backup_guardians,
@@ -179,6 +181,7 @@ pub enum SecuritySettings {
 #[derive(Drop, Serde, starknet::Store, Default)]
 pub enum VerificationStatus {
     #[default]
+    Nil,
     Unverified,
     PendingVerification,
     Verified,
@@ -232,7 +235,15 @@ pub struct ActivityRecord {
     pub ip_address: felt252,
     pub device_info: felt252,
 }
-
+#[derive(Copy, Drop, Serde, starknet::Store)]
+pub struct NotificationStruct {
+    pub email_notifications: bool,
+    pub push_notifications: bool,
+    pub claim_alerts: bool,
+    pub plan_updates: bool,
+    pub security_alerts: bool,
+    pub marketing_updates: bool,
+}
 #[derive(Drop, Serde, starknet::Store)]
 pub struct Wallet {
     pub address: ContractAddress,
