@@ -1,5 +1,8 @@
 use starknet::ContractAddress;
-use crate::types::{ActivityRecord, ActivityType, SimpleBeneficiary, UserProfile};
+use crate::types::{
+    ActivityRecord, ActivityType, NotificationSettings, NotificationStruct, SimpleBeneficiary,
+    UserProfile,
+};
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct InheritancePlan {
@@ -116,4 +119,21 @@ pub trait IInheritX<TContractState> {
     ) -> bool;
     fn get_profile(ref self: TContractState, address: ContractAddress) -> UserProfile;
     fn override_plan(ref self: TContractState, plan_id: u256);
+
+    fn update_notification(
+        ref self: TContractState,
+        user: ContractAddress,
+        email_notifications: bool,
+        push_notifications: bool,
+        claim_alerts: bool,
+        plan_updates: bool,
+        security_alerts: bool,
+        marketing_updates: bool,
+    ) -> NotificationStruct;
+
+    fn get_all_notification_preferences(
+        ref self: TContractState, user: ContractAddress,
+    ) -> NotificationStruct;
+
+    fn delete_user_profile(ref self: TContractState, address: ContractAddress) -> bool;
 }

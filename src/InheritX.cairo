@@ -6,13 +6,15 @@ pub mod InheritX {
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePathEntry,
         StoragePointerReadAccess, StoragePointerWriteAccess,
     };
-    use starknet::{ContractAddress, get_block_timestamp, get_caller_address, get_contract_address};
+    use starknet::{
+        ContractAddress, contract_address_const, get_block_timestamp, get_caller_address,
+        get_contract_address,
+    };
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
     use crate::types::{
-        ActivityRecord, ActivityType, NotificationSettings, SecuritySettings, SimpleBeneficiary,
-        UserProfile, UserRole, VerificationStatus,
+        ActivityRecord, ActivityType, NotificationSettings, NotificationStruct, SecuritySettings,
+        SimpleBeneficiary, UserProfile, UserRole, VerificationStatus,
     };
-
 
     #[storage]
     struct Storage {
@@ -63,6 +65,8 @@ pub mod InheritX {
         verification_attempts: Map<ContractAddress, u8>,
         verification_expiry: Map<ContractAddress, u64>,
         user_profiles: Map<ContractAddress, UserProfile>,
+        // storage mappings for notification
+        user_notifications: Map<ContractAddress, NotificationStruct>,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -81,11 +85,22 @@ pub mod InheritX {
     }
 
 
+    struct NotificationUpdated {
+        email_notifications: bool,
+        push_notifications: bool,
+        claim_alerts: bool,
+        plan_updates: bool,
+        security_alerts: bool,
+        marketing_updates: bool,
+        user: ContractAddress,
+    }
+
     #[event]
     #[derive(Drop, starknet::Event)]
     pub enum Event {
         ActivityRecordEvent: ActivityRecordEvent,
         BeneficiaryAdded: BeneficiaryAdded,
+        NotificationUpdated: NotificationUpdated,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -93,7 +108,7 @@ pub mod InheritX {
         user: ContractAddress,
         activity_id: u256,
     }
-    //     #[derive(Copy, Drop, Serde)]
+    //     #[derive(Copy, Drop, Serde)]ze
     //  enum VerificationStatus {
     //     Unverified,
     //     PendingVerification,
@@ -462,7 +477,6 @@ pub mod InheritX {
             beneficiary
         }
 
-
         fn is_beneficiary(self: @ContractState, plan_id: u256, address: ContractAddress) -> bool {
             self.is_beneficiary.read((plan_id, address))
         }
@@ -528,6 +542,75 @@ pub mod InheritX {
             self.plan_status.write(plan_id, PlanStatus::Cancelled);
             // 6. Emit PlanOverridden event
             self.emit(PlanOverridden { plan_id, caller });
+        fn update_notification(
+            ref self: ContractState,
+            user: ContractAddress,
+            email_notifications: bool,
+            push_notifications: bool,
+            claim_alerts: bool,
+            plan_updates: bool,
+            security_alerts: bool,
+            marketing_updates: bool,
+        ) -> NotificationStruct {
+            let user_notification = self.get_all_notification_preferences(user);
+            let updated_notification = NotificationStruct {
+                email_notifications: email_notifications,
+                push_notifications: push_notifications,
+                claim_alerts: claim_alerts,
+                plan_updates: plan_updates,
+                security_alerts: security_alerts,
+                marketing_updates: marketing_updates,
+            };
+            self.user_notifications.write(user, updated_notification);
+            self
+                .emit(
+                    Event::NotificationUpdated(
+                        NotificationUpdated {
+                            email_notifications,
+                            push_notifications,
+                            claim_alerts,
+                            plan_updates,
+                            security_alerts,
+                            marketing_updates,
+                            user,
+                        },
+                    ),
+                );
+            updated_notification
+        }
+
+        fn get_all_notification_preferences(
+            ref self: ContractState, user: ContractAddress,
+        ) -> NotificationStruct {
+            let notification = self.user_notifications.read(user);
+            notification
+        }
+
+        fn delete_user_profile(ref self: ContractState, address: ContractAddress) -> bool {
+            let admin = self.admin.read();
+            let mut user = self.user_profiles.read(address);
+            let caller = user.address;
+
+            assert(
+                get_caller_address() == admin || get_caller_address() == caller,
+                'No right to delete',
+            );
+            // user.address,
+            user.username = ' ';
+            user.address = contract_address_const::<0>();
+            user.email = ' ';
+            user.full_name = ' ';
+            user.profile_image = ' ';
+            user.verification_status = VerificationStatus::Nil;
+            user.role = UserRole::User;
+            user.notification_settings = NotificationSettings::Nil;
+            user.security_settings = SecuritySettings::Nil;
+            user.created_at = 0;
+            user.last_active = 0;
+
+            self.user_profiles.write(caller, user);
+
+            true
         }
     }
 }
