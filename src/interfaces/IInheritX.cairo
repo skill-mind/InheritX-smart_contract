@@ -93,6 +93,8 @@ pub trait IInheritX<TContractState> {
         self: @TContractState, user: ContractAddress, start_index: u256, page_size: u256,
     ) -> Array<ActivityRecord>;
 
+    fn get_total_activities(self: @ContractState) -> u64
+
     fn get_activity_history_length(self: @TContractState, user: ContractAddress) -> u256;
     fn get_total_plans(self: @TContractState) -> u256;
     fn create_profile(
