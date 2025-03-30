@@ -30,6 +30,14 @@ pub struct MediaMessage {
     pub media_content: felt252,
 }
 
+#[derive(Copy, Drop, Serde, starknet::Store, PartialEq)]
+pub enum PlanStatus {
+    Draft,
+    Active,
+    Executed,
+    Cancelled,
+}
+
 #[starknet::interface]
 pub trait IInheritX<TContractState> {
     // Initialize a new claim with a claim code
@@ -111,6 +119,7 @@ pub trait IInheritX<TContractState> {
         profile_image: felt252,
     ) -> bool;
     fn get_profile(ref self: TContractState, address: ContractAddress) -> UserProfile;
+    fn override_plan(ref self: TContractState, plan_id: u256);
 
     fn update_notification(
         ref self: TContractState,
@@ -128,6 +137,8 @@ pub trait IInheritX<TContractState> {
     ) -> NotificationStruct;
 
     fn delete_user_profile(ref self: TContractState, address: ContractAddress) -> bool;
+
+    fn can_override_plan(self: @TContractState, plan_id: u256) -> bool;
 
     fn update_security_settings(ref self: TContractState, new_settings: SecuritySettings) -> bool;
 }

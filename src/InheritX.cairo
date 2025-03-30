@@ -57,6 +57,9 @@ pub mod InheritX {
         plan_guardian_count: Map<u256, u8>,
         plan_asset_count: Map<u256, u8>,
         // storage mappings for plan_name and description
+        plan_names: Map<u256, felt252>,
+        plan_descriptions: Map<u256, felt252>,
+        plan_status: Map<u256, PlanStatus>,
         plan_name: Map<u256, felt252>,
         plan_description: Map<u256, felt252>,
         plans_count: u256,
@@ -64,7 +67,6 @@ pub mod InheritX {
             (u256, ContractAddress), SimpleBeneficiary,
         >, // (plan_id, beneficiary) -> beneficiary details
         // Plan details
-        plan_status: Map<u256, PlanStatus>, // plan_id -> status
         plan_conditions: Map<u256, PlanConditions>, // plan_id -> conditions
         // Tokens
         plan_tokens_count: Map<u256, u32>, // plan_id -> tokens_count
@@ -109,6 +111,12 @@ pub mod InheritX {
     }
 
     #[derive(Drop, starknet::Event)]
+    pub struct PlanOverridden {
+        pub plan_id: u256,
+        pub caller: ContractAddress,
+    }
+
+
     struct NotificationUpdated {
         email_notifications: bool,
         push_notifications: bool,
@@ -125,6 +133,7 @@ pub mod InheritX {
         ActivityRecordEvent: ActivityRecordEvent,
         BeneficiaryAdded: BeneficiaryAdded,
         NotificationUpdated: NotificationUpdated,
+        PlanOverridden: PlanOverridden,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -541,6 +550,33 @@ pub mod InheritX {
         fn get_total_plans(self: @ContractState) -> u256 {
             self.total_plans.read()
         }
+
+        //Mock function just to make override_plan works for now
+        fn can_override_plan(self: @ContractState, plan_id: u256) -> bool {
+            true
+        }
+
+
+        fn override_plan(ref self: ContractState, plan_id: u256) {
+            // 1. Assert plan_id exists (plan_id < self.plans_count.read())
+            let plans_count = self.plans_count.read();
+            assert(plan_id < plans_count, 'Plan ID does not exist');
+            // 2. Assert caller is the asset owner (caller == self.plan_asset_owner.read(plan_id))
+            let caller = starknet::get_caller_address();
+            let owner = self.plan_asset_owner.read(plan_id);
+            assert!(caller == owner, "Not plan owner");
+            // 3. Assert plan is in valid state for override (not executed)
+            let status = self.plan_status.read(plan_id);
+            assert(status != PlanStatus::Executed, 'Already executed');
+            // 4. Assert override conditions are met (can_override_plan returns true)
+            let can_override = self.can_override_plan(plan_id);
+            assert(can_override, 'Cannot override plan');
+            // 5. Update plan status to Cancelled
+            self.plan_status.write(plan_id, PlanStatus::Cancelled);
+            // 6. Emit PlanOverridden event
+            self.emit(PlanOverridden { plan_id, caller });
+        }
+
         fn update_notification(
             ref self: ContractState,
             user: ContractAddress,
@@ -689,19 +725,6 @@ pub mod InheritX {
             user.last_active = 0;
 
             self.user_profiles.write(caller, user);
-
-            true
-        }
-
-        fn update_security_settings(
-            ref self: ContractState, new_settings: SecuritySettings,
-        ) -> bool {
-            let caller = get_caller_address();
-            let mut profile = self.user_profiles.read(caller);
-            assert(profile.address == caller, 'Profile does not exist');
-            profile.security_settings = new_settings;
-
-            self.user_profiles.write(caller, profile);
 
             true
         }
