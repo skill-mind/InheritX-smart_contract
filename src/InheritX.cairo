@@ -3,8 +3,8 @@ pub mod InheritX {
     use core::num::traits::Zero;
     use core::traits::Into;
     use starknet::storage::{
-        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePathEntry,
-        StoragePointerReadAccess, StoragePointerWriteAccess,
+        Map, MutableVecTrait, StorageMapReadAccess, StorageMapWriteAccess, StoragePathEntry,
+        StoragePointerReadAccess, StoragePointerWriteAccess, Vec, VecTrait,
     };
     use starknet::{
         ContractAddress, contract_address_const, get_block_timestamp, get_caller_address,
@@ -12,10 +12,11 @@ pub mod InheritX {
     };
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
     use crate::types::{
-        ActivityRecord, ActivityType, NotificationSettings, NotificationStruct, SecuritySettings,
-        SimpleBeneficiary, UserProfile, UserRole, VerificationStatus,
-    };
 
+        ActivityRecord, ActivityType, MediaMessage, NotificationSettings, NotificationStruct,
+        PlanConditions, PlanOverview, PlanSection, PlanStatus, SecuritySettings, SimpleBeneficiary,
+        TokenAllocation, TokenInfo, UserProfile, UserRole, VerificationStatus,
+    };
 
     #[storage]
     struct Storage {
@@ -57,15 +58,47 @@ pub mod InheritX {
         plan_guardian_count: Map<u256, u8>,
         plan_asset_count: Map<u256, u8>,
         // storage mappings for plan_name and description
-        plan_names: Map<u256, felt252>,
-        plan_descriptions: Map<u256, felt252>,
+        plan_name: Map<u256, felt252>,
+        plan_description: Map<u256, felt252>,
+        plans_count: u256,
+        beneficiary_details: Map<
+            (u256, ContractAddress), SimpleBeneficiary,
+        >, // (plan_id, beneficiary) -> beneficiary details
+        // Plan details
+        plan_status: Map<u256, PlanStatus>, // plan_id -> status
+        plan_conditions: Map<u256, PlanConditions>, // plan_id -> conditions
+        // Tokens
+        plan_tokens_count: Map<u256, u32>, // plan_id -> tokens_count
+        plan_tokens: Map<(u256, u32), TokenInfo>, // (plan_id, index) -> token_info
+        token_allocations: Map<
+            (u256, ContractAddress, ContractAddress), TokenAllocation,
+        >, // (plan_id, beneficiary, token) -> allocation
+        // Media messages
+        plan_media_messages: Map<(u256, u32), MediaMessage>, // (plan_id, message_index) -> message
+        media_message_recipients: Map<
+            (u256, u32, u32), ContractAddress,
+        >, // (plan_id, message_index, recipient_index) -> address
+        plan_media_messages_count: Map<u256, u32>,
         //Identity verification system
         verification_code: Map<ContractAddress, felt252>,
         verification_status: Map<ContractAddress, bool>,
         verification_attempts: Map<ContractAddress, u8>,
         verification_expiry: Map<ContractAddress, u64>,
         user_profiles: Map<ContractAddress, UserProfile>,
+
+        // storage mappings for notification
         user_notifications: Map<ContractAddress, NotificationStruct>,
+    }
+
+    // Response-only struct (not stored)
+    #[derive(Drop, Serde)]
+    pub struct MediaMessageResponse {
+        pub file_hash: felt252,
+        pub file_name: felt252,
+        pub file_type: felt252,
+        pub file_size: u64,
+        pub recipients: Array<ContractAddress>, // Only in memory
+        pub upload_date: u64,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -77,11 +110,23 @@ pub mod InheritX {
         email: felt252,
     }
 
+    #[derive(Drop, starknet::Event)]
+    struct NotificationUpdated {
+        email_notifications: bool,
+        push_notifications: bool,
+        claim_alerts: bool,
+        plan_updates: bool,
+        security_alerts: bool,
+        marketing_updates: bool,
+        user: ContractAddress,
+    }
+
     #[event]
     #[derive(Drop, starknet::Event)]
     pub enum Event {
         ActivityRecordEvent: ActivityRecordEvent,
         BeneficiaryAdded: BeneficiaryAdded,
+        NotificationUpdated: NotificationUpdated,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -89,7 +134,7 @@ pub mod InheritX {
         user: ContractAddress,
         activity_id: u256,
     }
-    //     #[derive(Copy, Drop, Serde)]
+    //     #[derive(Copy, Drop, Serde)]ze
     //  enum VerificationStatus {
     //     Unverified,
     //     PendingVerification,
@@ -145,8 +190,8 @@ pub mod InheritX {
             self.plans_id.write(plan_id + 1);
 
             // Store plan details
-            self.plan_names.write(plan_id, plan_name);
-            self.plan_descriptions.write(plan_id, description);
+            self.plan_name.write(plan_id, plan_name);
+            self.plan_description.write(plan_id, description);
             self.plan_asset_owner.write(plan_id, get_caller_address());
             self.plan_creation_date.write(plan_id, get_block_timestamp());
             self.plan_total_value.write(plan_id, total_value);
@@ -192,6 +237,8 @@ pub mod InheritX {
             self.active_plans.write(current_active_plans + 1);
             let current_tvl = self.total_value_locked.read();
             self.total_value_locked.write(current_tvl + total_value);
+
+            self.plan_status.write(plan_id, PlanStatus::Active);
 
             // Transfer assets to contract
             i = 0;
@@ -452,15 +499,6 @@ pub mod InheritX {
             beneficiary
         }
 
-
-        fn is_beneficiary(self: @ContractState, plan_id: u256, address: ContractAddress) -> bool {
-            self.is_beneficiary.read((plan_id, address))
-        }
-
-        fn set_plan_transfer_date(ref self: ContractState, plan_id: u256, date: u64) {
-            self.plan_transfer_date.write(plan_id, date);
-        }
-
         fn get_activity_history(
             self: @ContractState, user: ContractAddress, start_index: u256, page_size: u256,
         ) -> Array<ActivityRecord> {
@@ -491,12 +529,143 @@ pub mod InheritX {
             activity_history
         }
 
+        fn is_beneficiary(self: @ContractState, plan_id: u256, address: ContractAddress) -> bool {
+            self.is_beneficiary.read((plan_id, address))
+        }
+
+        fn set_plan_transfer_date(ref self: ContractState, plan_id: u256, date: u64) {
+            self.plan_transfer_date.write(plan_id, date);
+        }
         fn get_activity_history_length(self: @ContractState, user: ContractAddress) -> u256 {
             self.user_activities_pointer.entry(user).read()
         }
 
         fn get_total_plans(self: @ContractState) -> u256 {
             self.total_plans.read()
+        }
+        fn update_notification(
+            ref self: ContractState,
+            user: ContractAddress,
+            email_notifications: bool,
+            push_notifications: bool,
+            claim_alerts: bool,
+            plan_updates: bool,
+            security_alerts: bool,
+            marketing_updates: bool,
+        ) -> NotificationStruct {
+            let user_notification = self.get_all_notification_preferences(user);
+            let updated_notification = NotificationStruct {
+                email_notifications: email_notifications,
+                push_notifications: push_notifications,
+                claim_alerts: claim_alerts,
+                plan_updates: plan_updates,
+                security_alerts: security_alerts,
+                marketing_updates: marketing_updates,
+            };
+            self.user_notifications.write(user, updated_notification);
+            self
+                .emit(
+                    Event::NotificationUpdated(
+                        NotificationUpdated {
+                            email_notifications,
+                            push_notifications,
+                            claim_alerts,
+                            plan_updates,
+                            security_alerts,
+                            marketing_updates,
+                            user,
+                        },
+                    ),
+                );
+            updated_notification
+        }
+
+        fn get_all_notification_preferences(
+            ref self: ContractState, user: ContractAddress,
+        ) -> NotificationStruct {
+            let notification = self.user_notifications.read(user);
+            notification
+        }
+
+        fn get_plan_section(
+            self: @ContractState, plan_id: u256, section: PlanSection,
+        ) -> PlanOverview {
+            // Assert that the plan_id exists
+            let current_total_plans = self.total_plans.read();
+            assert(plan_id < current_total_plans, 'Plan does not exist');
+
+            // Get all tokens for this plan
+            let tokens_count = self.plan_tokens_count.read(plan_id);
+            let mut tokens = ArrayTrait::new();
+
+            for i in 0..tokens_count {
+                let token_info = self.plan_tokens.read((plan_id, i));
+                tokens.append(token_info);
+            }
+
+            // Create a PlanOverview struct with basic details
+            let mut plan_overview = PlanOverview {
+                plan_id: plan_id,
+                name: self.plan_name.read(plan_id),
+                description: self.plan_description.read(plan_id),
+                tokens_transferred: tokens,
+                transfer_date: self.plan_transfer_date.read(plan_id),
+                inactivity_period: self.plan_conditions.read(plan_id).inactivity_period,
+                multi_signature_enabled: self
+                    .plan_conditions
+                    .read(plan_id)
+                    .multi_signature_required,
+                creation_date: self.plan_creation_date.read(plan_id),
+                status: self.plan_status.read(plan_id),
+                total_value: self.plan_total_value.read(plan_id),
+                beneficiaries: ArrayTrait::new(),
+                media_messages: ArrayTrait::new(),
+            };
+
+            // Fill section-specific details using if statements instead of match
+            if section == PlanSection::BasicInformation { // Basic information is already filled
+            } else if section == PlanSection::Beneficiaries {
+                let beneficiaries_count = self.plan_beneficiaries_count.read(plan_id);
+                let mut beneficiaries: Array<SimpleBeneficiary> = ArrayTrait::new();
+
+                for i in 0..beneficiaries_count {
+                    let beneficiary_address = self.plan_beneficiaries.read((plan_id, i));
+                    let beneficiary_details = self
+                        .beneficiary_details
+                        .read((plan_id, beneficiary_address));
+                    beneficiaries.append(beneficiary_details);
+                }
+                plan_overview.beneficiaries = beneficiaries;
+            } else if section == PlanSection::MediaAndRecipients {
+                let media_messages_count = self.plan_media_messages_count.read(plan_id);
+                let mut media_messages_result = ArrayTrait::new();
+
+                for i in 0..media_messages_count {
+                    let media_message = self.plan_media_messages.read((plan_id, i));
+                    let mut recipients = ArrayTrait::new();
+
+                    // Read each recipient from separate storage
+                    for j in 0..media_message.recipients_count {
+                        let recipient = self.media_message_recipients.read((plan_id, i, j));
+                        recipients.append(recipient);
+                    }
+
+                    // Create response structure (only exists in memory)
+                    let response = MediaMessageResponse {
+                        file_hash: media_message.file_hash,
+                        file_name: media_message.file_name,
+                        file_type: media_message.file_type,
+                        file_size: media_message.file_size,
+                        recipients,
+                        upload_date: media_message.upload_date,
+                    };
+
+                    media_messages_result.append(response);
+                }
+                plan_overview.media_messages = media_messages_result;
+            }
+
+            plan_overview
         }
 
         fn delete_user_profile(ref self: ContractState, address: ContractAddress) -> bool {
@@ -679,6 +848,18 @@ pub mod InheritX {
 
         fn get_user_profile(self: @ContractState, user: ContractAddress) -> UserProfile {
             self.user_profiles.read(user)
+        }
+        fn update_security_settings(
+            ref self: ContractState, new_settings: SecuritySettings,
+        ) -> bool {
+            let caller = get_caller_address();
+            let mut profile = self.user_profiles.read(caller);
+            assert(profile.address == caller, 'Profile does not exist');
+            profile.security_settings = new_settings;
+
+            self.user_profiles.write(caller, profile);
+
+            true
         }
     }
 }
