@@ -1,5 +1,6 @@
 #[starknet::contract]
 pub mod InheritX {
+    use core::array::ArrayTrait;
     use core::num::traits::Zero;
     use core::traits::Into;
     use starknet::storage::{
@@ -14,7 +15,7 @@ pub mod InheritX {
     use crate::types::{
         ActivityRecord, ActivityType, MediaMessage, NotificationSettings, NotificationStruct,
         PlanConditions, PlanOverview, PlanSection, PlanStatus, SecuritySettings, SimpleBeneficiary,
-        TokenAllocation, TokenInfo, UserProfile, UserRole, VerificationStatus,
+        TokenAllocation, TokenInfo, UserProfile, UserRole, VerificationStatus, Wallet,
     };
 
     #[storage]
@@ -86,6 +87,11 @@ pub mod InheritX {
         user_profiles: Map<ContractAddress, UserProfile>,
         // storage mappings for notification
         user_notifications: Map<ContractAddress, NotificationStruct>,
+        // Updated wallet-related storage mappings
+        user_wallets_length: Map<ContractAddress, u256>,
+        user_wallets: Map<(ContractAddress, u256), Wallet>,
+        user_primary_wallet: Map<ContractAddress, ContractAddress>,
+        total_user_wallets: Map<ContractAddress, u256>,
     }
 
     // Response-only struct (not stored)
@@ -858,6 +864,93 @@ pub mod InheritX {
             self.user_profiles.write(caller, profile);
 
             true
+        }
+
+        // Wallet Management Functions
+        fn add_wallet(
+            ref self: ContractState, wallet: ContractAddress, wallet_type: felt252,
+        ) -> bool {
+            assert!(wallet != starknet::contract_address_const::<0>(), "Invalid wallet address");
+            let user = get_caller_address();
+            let length = self.user_wallets_length.read(user);
+
+            //
+            let mut wallet_exists = false;
+            let mut i = 0;
+            while i < length {
+                let w = self.user_wallets.read((user, i));
+                if w.address == wallet {
+                    wallet_exists = true;
+                    break;
+                }
+                i += 1;
+            }
+            assert!(!wallet_exists, "Wallet already exists");
+
+            let new_wallet = Wallet {
+                address: wallet,
+                is_primary: length == 0,
+                wallet_type,
+                added_at: get_block_timestamp(),
+            };
+            self.user_wallets.write((user, length), new_wallet);
+            self.user_wallets_length.write(user, length + 1);
+
+            if length == 0 {
+                self.user_primary_wallet.write(user, wallet);
+            }
+
+            let total_wallets = self.total_user_wallets.read(user);
+            self.total_user_wallets.write(user, total_wallets + 1);
+
+            true
+        }
+
+        fn set_primary_wallet(ref self: ContractState, wallet: ContractAddress) -> bool {
+            let user = get_caller_address();
+            let length = self.user_wallets_length.read(user);
+
+            let mut wallet_found = false;
+            let mut wallet_index = 0;
+            let mut i = 0;
+            while i < length {
+                let w = self.user_wallets.read((user, i));
+                if w.address == wallet {
+                    wallet_found = true;
+                    wallet_index = i;
+                    break;
+                }
+                i += 1;
+            }
+            assert!(wallet_found, "Wallet not found");
+
+            i = 0;
+            while i < length {
+                let mut w = self.user_wallets.read((user, i));
+                w.is_primary = (i == wallet_index);
+                self.user_wallets.write((user, i), w);
+                i += 1;
+            }
+
+            self.user_primary_wallet.write(user, wallet);
+
+            true
+        }
+
+        fn get_primary_wallet(self: @ContractState, user: ContractAddress) -> ContractAddress {
+            self.user_primary_wallet.read(user)
+        }
+
+        fn get_user_wallets(self: @ContractState, user: ContractAddress) -> Array<Wallet> {
+            let length = self.user_wallets_length.read(user);
+            let mut wallets = ArrayTrait::new();
+            let mut i = 0;
+            while i < length {
+                let wallet = self.user_wallets.read((user, i));
+                core::array::ArrayTrait::append(ref wallets, wallet);
+                i += 1;
+            }
+            wallets
         }
     }
 }

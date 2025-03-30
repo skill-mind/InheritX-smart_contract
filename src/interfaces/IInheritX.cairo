@@ -1,7 +1,7 @@
 use starknet::ContractAddress;
 use crate::types::{
     ActivityRecord, ActivityType, NotificationSettings, NotificationStruct, PlanOverview,
-    PlanSection, SecuritySettings, SimpleBeneficiary, TokenInfo, UserProfile,
+    PlanSection, SecuritySettings, SimpleBeneficiary, TokenInfo, UserProfile, Wallet,
 };
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
@@ -152,4 +152,11 @@ pub trait IInheritX<TContractState> {
     fn get_user_profile(self: @TContractState, user: ContractAddress) -> UserProfile;
 
     fn update_security_settings(ref self: TContractState, new_settings: SecuritySettings) -> bool;
+
+
+    // New Wallet Management Methods
+    fn add_wallet(ref self: TContractState, wallet: ContractAddress, wallet_type: felt252) -> bool;
+    fn set_primary_wallet(ref self: TContractState, wallet: ContractAddress) -> bool;
+    fn get_primary_wallet(self: @TContractState, user: ContractAddress) -> ContractAddress;
+    fn get_user_wallets(self: @TContractState, user: ContractAddress) -> Array<Wallet>;
 }

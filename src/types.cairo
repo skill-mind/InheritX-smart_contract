@@ -252,3 +252,11 @@ pub struct NotificationStruct {
     pub security_alerts: bool,
     pub marketing_updates: bool,
 }
+#[derive(Drop, Serde, starknet::Store)]
+pub struct Wallet {
+    pub address: ContractAddress,
+    pub is_primary: bool,
+    pub wallet_type: felt252,
+    pub added_at: u64,
+}
+

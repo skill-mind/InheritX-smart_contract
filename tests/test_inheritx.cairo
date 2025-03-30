@@ -10,8 +10,9 @@ mod tests {
         UserProfile, UserRole, VerificationStatus,
     };
     use snforge_std::{
-        CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_caller_address, declare,
-        start_cheat_block_timestamp, start_cheat_caller_address, stop_cheat_caller_address,
+        CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_block_timestamp,
+        cheat_caller_address, declare, start_cheat_block_timestamp, start_cheat_caller_address,
+        stop_cheat_caller_address,
     };
     use starknet::class_hash::ClassHash;
     use starknet::testing::{set_caller_address, set_contract_address};
@@ -581,5 +582,141 @@ mod tests {
         start_cheat_caller_address(contract_address, user);
         // Attempt to claim without profile
         IInheritXDispatcher.collect_claim(1, user, 1234);
+    }
+
+    // New Wallet Management Tests
+
+    #[test]
+    fn test_add_first_wallet() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
+        let wallet_addr = contract_address_const::<'wallet1'>();
+        let wallet_type = 'personal';
+
+        start_cheat_caller_address(contract_address, user);
+        cheat_block_timestamp(contract_address, 1000, CheatSpan::Indefinite);
+
+        let success = dispatcher.add_wallet(wallet_addr, wallet_type);
+        assert(success, 'add_wallet failed');
+
+        let primary_wallet = dispatcher.get_primary_wallet(user);
+        assert(primary_wallet == wallet_addr, 'primary wallet mismatch');
+
+        let wallets = dispatcher.get_user_wallets(user);
+        assert(wallets.len() == 1, 'wallet count mismatch');
+        let wallet = wallets.at(0);
+        assert(*wallet.address == wallet_addr, 'address mismatch');
+        assert(*wallet.is_primary, 'should be primary');
+        assert(*wallet.wallet_type == wallet_type, 'type mismatch');
+        assert(*wallet.added_at > 0, 'added_at not set');
+    }
+
+    #[test]
+    fn test_add_multiple_wallets() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
+        let wallet1 = contract_address_const::<'wallet1'>();
+        let wallet2 = contract_address_const::<'wallet2'>();
+        let wallet3 = contract_address_const::<'wallet3'>();
+        let wallet_type = 'personal';
+
+        start_cheat_caller_address(contract_address, user);
+        cheat_block_timestamp(contract_address, 1000, CheatSpan::Indefinite);
+
+        dispatcher.add_wallet(wallet1, wallet_type);
+        dispatcher.add_wallet(wallet2, wallet_type);
+        dispatcher.add_wallet(wallet3, wallet_type);
+
+        let wallets = dispatcher.get_user_wallets(user);
+        assert(wallets.len() == 3, 'wallet count mismatch');
+
+        let primary_wallet = dispatcher.get_primary_wallet(user);
+        assert(primary_wallet == wallet1, 'primary wallet mismatch');
+    }
+
+    #[test]
+    fn test_set_primary_wallet() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
+        let wallet1 = contract_address_const::<'wallet1'>();
+        let wallet2 = contract_address_const::<'wallet2'>();
+        let wallet_type = 'personal';
+
+        start_cheat_caller_address(contract_address, user);
+        cheat_block_timestamp(contract_address, 1000, CheatSpan::Indefinite);
+
+        dispatcher.add_wallet(wallet1, wallet_type);
+        dispatcher.add_wallet(wallet2, wallet_type);
+
+        let success = dispatcher.set_primary_wallet(wallet2);
+        assert(success, 'set_primary failed');
+
+        let primary_wallet = dispatcher.get_primary_wallet(user);
+        assert(primary_wallet == wallet2, 'primary wallet mismatch');
+
+        let wallets = dispatcher.get_user_wallets(user);
+        assert(*wallets.at(0).is_primary == false, 'wallet1 should not be primary');
+        assert(*wallets.at(1).is_primary, 'wallet2 should be primary');
+    }
+
+    #[test]
+    #[should_panic(
+        expected: (
+            0x46a6158a16a947e5916b2a2ca68501a45e93d7110e81aa2d6438b1c57c879a3,
+            0x0,
+            'Wallet already exists',
+            0x15,
+        ),
+    )]
+    fn test_add_duplicate_wallet() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
+        let wallet_addr = contract_address_const::<'wallet1'>();
+        let wallet_type = 'personal';
+
+        start_cheat_caller_address(contract_address, user);
+        cheat_block_timestamp(contract_address, 1000, CheatSpan::Indefinite);
+
+        dispatcher.add_wallet(wallet_addr, wallet_type);
+        dispatcher.add_wallet(wallet_addr, wallet_type); // Should panic
+    }
+
+    #[test]
+    #[should_panic(
+        expected: (
+            0x46a6158a16a947e5916b2a2ca68501a45e93d7110e81aa2d6438b1c57c879a3,
+            0x0,
+            'Wallet not found',
+            0x10,
+        ),
+    )]
+    fn test_set_primary_non_existent_wallet() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
+        let non_existent_wallet = contract_address_const::<'non_existent'>();
+
+        start_cheat_caller_address(contract_address, user);
+        dispatcher.set_primary_wallet(non_existent_wallet); // Should panic
+    }
+
+    #[test]
+    fn test_wallet_types() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
+        let wallet1 = contract_address_const::<'wallet1'>();
+        let wallet2 = contract_address_const::<'wallet2'>();
+        let type_personal = 'personal';
+        let type_inheritance = 'inheritance';
+
+        start_cheat_caller_address(contract_address, user);
+        cheat_block_timestamp(contract_address, 1000, CheatSpan::Indefinite);
+
+        dispatcher.add_wallet(wallet1, type_personal);
+        dispatcher.add_wallet(wallet2, type_inheritance);
+
+        let wallets = dispatcher.get_user_wallets(user);
+        assert(wallets.len() == 2, 'wallet count mismatch');
+        assert(*wallets.at(0).wallet_type == type_personal, 'type1 mismatch');
+        assert(*wallets.at(1).wallet_type == type_inheritance, 'type2 mismatch');
     }
 }
