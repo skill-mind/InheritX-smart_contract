@@ -12,8 +12,8 @@ pub mod InheritX {
     };
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
     use crate::types::{
-        ActivityRecord, ActivityType, NotificationSettings, SecuritySettings, SimpleBeneficiary,
-        UserProfile, UserRole, VerificationStatus,
+        ActivityRecord, ActivityType, NotificationSettings, NotificationStruct, SecuritySettings,
+        SimpleBeneficiary, UserProfile, UserRole, VerificationStatus,
     };
 
 
@@ -65,6 +65,7 @@ pub mod InheritX {
         verification_attempts: Map<ContractAddress, u8>,
         verification_expiry: Map<ContractAddress, u64>,
         user_profiles: Map<ContractAddress, UserProfile>,
+        user_notifications: Map<ContractAddress, NotificationStruct>,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -137,7 +138,7 @@ pub mod InheritX {
                 let asset = tokens.at(i);
                 total_value += *asset.amount;
                 i += 1;
-            };
+            }
 
             // Generate new plan ID
             let plan_id = self.plans_id.read();
@@ -169,7 +170,7 @@ pub mod InheritX {
                 self.plan_assets.write((plan_id, asset_index), *tokens.at(i));
                 asset_index += 1;
                 i += 1;
-            };
+            }
             self.plan_asset_count.write(plan_id, asset_count.try_into().unwrap());
 
             // Store beneficiaries
@@ -181,7 +182,7 @@ pub mod InheritX {
                 self.is_beneficiary.write((plan_id, beneficiary), true);
                 beneficiary_index += 1;
                 i += 1;
-            };
+            }
             self.plan_beneficiaries_count.write(plan_id, beneficiary_count);
 
             // Update protocol statistics
@@ -198,7 +199,7 @@ pub mod InheritX {
                 let asset = tokens.at(i);
                 self.transfer_funds(get_contract_address(), *asset.amount);
                 i += 1;
-            };
+            }
 
             // Return the plan ID
             plan_id
@@ -479,13 +480,13 @@ pub mod InheritX {
             loop {
                 if current_index > end_index {
                     break;
-                };
+                }
 
                 let record = self.user_activities.entry(user).entry(current_index).read();
                 activity_history.append(record);
 
                 current_index += 1;
-            };
+            }
 
             activity_history
         }
@@ -523,6 +524,161 @@ pub mod InheritX {
             self.user_profiles.write(caller, user);
 
             true
+        }
+
+        fn update_user_profile(
+            ref self: ContractState,
+            username: felt252,
+            email: felt252,
+            full_name: felt252,
+            profile_image: felt252,
+            notification_settings: NotificationSettings,
+            security_settings: SecuritySettings,
+        ) -> bool {
+            // Get the caller's address
+            let caller = get_caller_address();
+
+            // Check if the profile exists
+            let mut profile = self.user_profiles.read(caller);
+
+            // Ensure the profile belongs to the caller
+            assert(profile.address == caller || profile.address.is_zero(), 'Not authorized');
+
+            // Update profile fields
+            profile.address = caller;
+            profile.username = username;
+            profile.email = email;
+            profile.full_name = full_name;
+            profile.profile_image = profile_image;
+            profile.notification_settings = notification_settings;
+            profile.security_settings = security_settings;
+            profile.last_active = get_block_timestamp();
+
+            // If this is a new profile, set creation date
+            if profile.created_at.is_zero() {
+                profile.created_at = get_block_timestamp();
+                // Set default role for new profiles
+                profile.role = UserRole::User;
+                profile.verification_status = VerificationStatus::Unverified;
+            }
+
+            // Save updated profile
+            self.user_profiles.write(caller, profile);
+
+            // Record this activity
+            self._record_activity(caller, ActivityType::ProfileUpdate, 'Profile updated');
+
+            // Update notification settings if provided
+            let ns = notification_settings;
+            match ns {
+                NotificationSettings::Nil => (),
+                _ => self._update_notification_settings(caller, ns),
+            }
+
+            true
+        }
+
+        // Helper function to update notification settings
+        fn _update_notification_settings(
+            ref self: ContractState, user: ContractAddress, settings: NotificationSettings,
+        ) {
+            // Convert the enum to a struct for storage
+            let notification_struct = match settings {
+                NotificationSettings::Default => NotificationStruct {
+                    email_notifications: true,
+                    push_notifications: true,
+                    claim_alerts: true,
+                    plan_updates: true,
+                    security_alerts: true,
+                    marketing_updates: false,
+                },
+                NotificationSettings::Nil => NotificationStruct {
+                    email_notifications: false,
+                    push_notifications: false,
+                    claim_alerts: false,
+                    plan_updates: false,
+                    security_alerts: false,
+                    marketing_updates: false,
+                },
+                NotificationSettings::email_notifications => NotificationStruct {
+                    email_notifications: true,
+                    push_notifications: false,
+                    claim_alerts: false,
+                    plan_updates: false,
+                    security_alerts: false,
+                    marketing_updates: false,
+                },
+                NotificationSettings::push_notifications => NotificationStruct {
+                    email_notifications: false,
+                    push_notifications: true,
+                    claim_alerts: false,
+                    plan_updates: false,
+                    security_alerts: false,
+                    marketing_updates: false,
+                },
+                NotificationSettings::claim_alerts => NotificationStruct {
+                    email_notifications: false,
+                    push_notifications: false,
+                    claim_alerts: true,
+                    plan_updates: false,
+                    security_alerts: false,
+                    marketing_updates: false,
+                },
+                NotificationSettings::plan_updates => NotificationStruct {
+                    email_notifications: false,
+                    push_notifications: false,
+                    claim_alerts: false,
+                    plan_updates: true,
+                    security_alerts: false,
+                    marketing_updates: false,
+                },
+                NotificationSettings::security_alerts => NotificationStruct {
+                    email_notifications: false,
+                    push_notifications: false,
+                    claim_alerts: false,
+                    plan_updates: false,
+                    security_alerts: true,
+                    marketing_updates: false,
+                },
+                NotificationSettings::marketing_updates => NotificationStruct {
+                    email_notifications: false,
+                    push_notifications: false,
+                    claim_alerts: false,
+                    plan_updates: false,
+                    security_alerts: false,
+                    marketing_updates: true,
+                },
+            };
+
+            self.user_notifications.write(user, notification_struct);
+        }
+
+        // Helper function to record user activity
+        fn _record_activity(
+            ref self: ContractState,
+            user: ContractAddress,
+            activity_type: ActivityType,
+            details: felt252,
+        ) {
+            let current_pointer = self.user_activities_pointer.read(user);
+            let next_pointer = current_pointer + 1_u256;
+
+            let activity = ActivityRecord {
+                timestamp: get_block_timestamp(),
+                activity_type: activity_type,
+                details: details,
+                ip_address: 0, // We can't get IP in Cairo, so using 0
+                device_info: 0 // We can't get device info in Cairo, so using 0
+            };
+
+            // Fix: Use entry() pattern for nested maps
+            self.user_activities.entry(user).entry(current_pointer).write(activity);
+            self.user_activities_pointer.write(user, next_pointer);
+        }
+
+
+        fn get_user_profile(self: @ContractState, user: ContractAddress) -> UserProfile {
+            self.user_profiles.read(user)
         }
     }
 }
