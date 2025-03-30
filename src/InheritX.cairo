@@ -84,6 +84,8 @@ pub mod InheritX {
         verification_attempts: Map<ContractAddress, u8>,
         verification_expiry: Map<ContractAddress, u64>,
         user_profiles: Map<ContractAddress, UserProfile>,
+        expected_code: Map<ContractAddress, felt252>,
+        verification_status: Map<ContractAddress, bool>,
         // storage mappings for notification
         user_notifications: Map<ContractAddress, NotificationStruct>,
     }
@@ -541,6 +543,21 @@ pub mod InheritX {
         fn get_total_plans(self: @ContractState) -> u256 {
             self.total_plans.read()
         }
+
+        fn verify_code(ref self: ContractState, user: ContractAddress, code: felt252) -> bool {
+            let stored_code = self.expected_code.read(user);
+            let is_valid = stored_code == code;
+
+            if is_valid {
+                self.verification_status.write(user, true);
+            }
+            is_valid
+        }
+
+        fn is_verified(self: @ContractState, user: ContractAddress) -> bool {
+            self.verification_status.read(user)
+        }
+        
         fn update_notification(
             ref self: ContractState,
             user: ContractAddress,

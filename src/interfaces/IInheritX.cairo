@@ -112,6 +112,9 @@ pub trait IInheritX<TContractState> {
     ) -> bool;
     fn get_profile(ref self: TContractState, address: ContractAddress) -> UserProfile;
 
+    fn verify_code(ref self: TContractState, user: ContractAddress, code: felt252) -> bool;
+    fn is_verified(self: @TContractState, user: ContractAddress) -> bool;
+
     fn update_notification(
         ref self: TContractState,
         user: ContractAddress,
