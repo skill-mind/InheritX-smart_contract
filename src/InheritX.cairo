@@ -67,7 +67,6 @@ pub mod InheritX {
             (u256, ContractAddress), SimpleBeneficiary,
         >, // (plan_id, beneficiary) -> beneficiary details
         // Plan details
-        plan_status: Map<u256, PlanStatus>, // plan_id -> status
         plan_conditions: Map<u256, PlanConditions>, // plan_id -> conditions
         // Tokens
         plan_tokens_count: Map<u256, u32>, // plan_id -> tokens_count
@@ -134,6 +133,7 @@ pub mod InheritX {
         ActivityRecordEvent: ActivityRecordEvent,
         BeneficiaryAdded: BeneficiaryAdded,
         NotificationUpdated: NotificationUpdated,
+        PlanOverridden: PlanOverridden,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -148,12 +148,6 @@ pub mod InheritX {
     //     Verified,
     //     Rejected,
     // }
-
-    #[event]
-    #[derive(Drop, starknet::Event)]
-    enum Event {
-        PlanOverridden: PlanOverridden,
-    }
 
     #[constructor]
     fn constructor(ref self: ContractState) {
@@ -555,6 +549,11 @@ pub mod InheritX {
 
         fn get_total_plans(self: @ContractState) -> u256 {
             self.total_plans.read()
+        }
+
+        //Mock function just to make override_plan works for now
+        fn can_override_plan(self: @ContractState, plan_id: u256) -> bool {
+            true
         }
 
 

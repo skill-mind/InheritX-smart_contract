@@ -137,4 +137,6 @@ pub trait IInheritX<TContractState> {
     ) -> NotificationStruct;
 
     fn delete_user_profile(ref self: TContractState, address: ContractAddress) -> bool;
+
+    fn can_override_plan(self: @TContractState, plan_id: u256) -> bool;
 }
