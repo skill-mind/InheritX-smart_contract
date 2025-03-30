@@ -1,7 +1,7 @@
 use starknet::ContractAddress;
 use crate::types::{
     ActivityRecord, ActivityType, NotificationSettings, NotificationStruct, PlanOverview,
-    PlanSection, SecuritySettings, SimpleBeneficiary, TokenInfo, UserProfile,
+    PlanSection, PlanStatus, SecuritySettings, SimpleBeneficiary, TokenInfo, UserProfile,
 };
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
@@ -128,28 +128,10 @@ pub trait IInheritX<TContractState> {
     ) -> NotificationStruct;
 
     fn delete_user_profile(ref self: TContractState, address: ContractAddress) -> bool;
-    fn update_user_profile(
-        ref self: TContractState,
-        username: felt252,
-        email: felt252,
-        full_name: felt252,
-        profile_image: felt252,
-        notification_settings: NotificationSettings,
-        security_settings: SecuritySettings,
-    ) -> bool;
-
-    fn _update_notification_settings(
-        ref self: TContractState, user: ContractAddress, settings: NotificationSettings,
-    );
-
-    fn _record_activity(
-        ref self: TContractState,
-        user: ContractAddress,
-        activity_type: ActivityType,
-        details: felt252,
-    );
-
-    fn get_user_profile(self: @TContractState, user: ContractAddress) -> UserProfile;
 
     fn update_security_settings(ref self: TContractState, new_settings: SecuritySettings) -> bool;
+
+    fn get_plan_status_enum(self: @TContractState, plan_id: u256) -> PlanStatus;
+
+    fn is_plan_valid(self: @TContractState, plan_id: u256) -> bool;
 }

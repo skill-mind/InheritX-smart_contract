@@ -5,13 +5,13 @@ mod tests {
         AssetAllocation, IInheritX, IInheritXDispatcher, IInheritXDispatcherTrait,
     };
     use inheritx::types::{
-        ActivityType, MediaMessage, NotificationSettings, NotificationStruct, PlanConditions,
-        PlanOverview, PlanSection, PlanStatus, SecuritySettings, SimpleBeneficiary, TokenInfo,
-        UserProfile, UserRole, VerificationStatus,
+        ActivityType, MediaMessage, PlanConditions, PlanOverview, PlanSection, PlanStatus,
+        SecuritySettings, SimpleBeneficiary, TokenInfo, UserProfile,
     };
     use snforge_std::{
-        CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_caller_address, declare,
-        start_cheat_block_timestamp, start_cheat_caller_address, stop_cheat_caller_address,
+        CheatSpan, ContractClassTrait, DeclareResultTrait, EventSpyAssertionsTrait,
+        cheat_caller_address, declare, spy_events, start_cheat_caller_address,
+        stop_cheat_caller_address,
     };
     use starknet::class_hash::ClassHash;
     use starknet::testing::{set_caller_address, set_contract_address};
@@ -27,8 +27,6 @@ mod tests {
 
         let dispatcher = IInheritXDispatcher { contract_address };
 
-        // Set initial block timestamp using cheatcode
-        start_cheat_block_timestamp(contract_address, 1000);
         (dispatcher, contract_address)
     }
 
@@ -224,91 +222,6 @@ mod tests {
         dispatcher.create_inheritance_plan(plan_name, assets, description, pick_beneficiaries);
     }
 
-    #[test]
-    fn test_update_new_user_profile() {
-        let (dispatcher, contract_address) = setup();
-        let caller = contract_address_const::<'address'>();
-        start_cheat_caller_address(contract_address, caller);
-
-        let username = 'newuser';
-        let email = 'user@example.com';
-        let full_name = 'New User';
-        let profile_image = 'image_hash';
-        let notification_settings = NotificationSettings::Default;
-        let security_settings = SecuritySettings::Two_factor_enabled;
-
-        // Update profile for the first time (creating new profile)
-        let result = dispatcher
-            .update_user_profile(
-                username, email, full_name, profile_image, notification_settings, security_settings,
-            );
-        assert(result == true, 'Profile update should succeed');
-
-        // Verify the profile was created correctly
-        let profile = dispatcher.get_user_profile(caller);
-        assert(
-            profile.security_settings == SecuritySettings::Two_factor_enabled,
-            'should be Two_factor_enabled',
-        );
-
-        stop_cheat_caller_address(contract_address);
-    }
-
-    #[test]
-    fn test_security_settings_enum_values() {
-        let (dispatcher, contract_address) = setup();
-        let caller = contract_address_const::<'address'>();
-        start_cheat_caller_address(contract_address, caller);
-
-        // Test with Nil security settings
-        dispatcher
-            .update_user_profile(
-                'user1',
-                'user1@example.com',
-                'User One',
-                'image1',
-                NotificationSettings::Default,
-                SecuritySettings::Nil,
-            );
-        let profile = dispatcher.get_user_profile(caller);
-        assert(
-            profile.security_settings == SecuritySettings::Nil, 'Security settings should be Nil',
-        );
-
-        // Test with recovery_email
-        dispatcher
-            .update_user_profile(
-                'user1',
-                'user1@example.com',
-                'User One',
-                'image1',
-                NotificationSettings::Default,
-                SecuritySettings::recovery_email,
-            );
-        let profile = dispatcher.get_user_profile(caller);
-        assert(
-            profile.security_settings == SecuritySettings::recovery_email,
-            'should be recovery_email',
-        );
-
-        // Test with backup_guardians
-        dispatcher
-            .update_user_profile(
-                'user1',
-                'user1@example.com',
-                'User One',
-                'image1',
-                NotificationSettings::Default,
-                SecuritySettings::backup_guardians,
-            );
-        let profile = dispatcher.get_user_profile(caller);
-        assert(
-            profile.security_settings == SecuritySettings::backup_guardians,
-            'should be backup_guardians',
-        );
-
-        stop_cheat_caller_address(contract_address);
-    }
     // Helper function to setup contract with a test plan
     fn setup_with_plan() -> (IInheritXDispatcher, u256, ContractAddress) {
         let (IInheritXDispatcher, contract_address) = setup();
