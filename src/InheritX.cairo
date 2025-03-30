@@ -15,7 +15,7 @@ pub mod InheritX {
     use crate::types::{
         ActivityRecord, ActivityType, MediaMessage, NotificationSettings, NotificationStruct,
         PlanConditions, PlanOverview, PlanSection, PlanStatus, SecuritySettings, SimpleBeneficiary,
-        TokenAllocation, TokenInfo, UserProfile, UserRole, VerificationStatus,Wallet
+        TokenAllocation, TokenInfo, UserProfile, UserRole, VerificationStatus, Wallet,
     };
 
     #[storage]

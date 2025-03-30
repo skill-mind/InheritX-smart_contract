@@ -10,8 +10,8 @@ mod tests {
     };
     use snforge_std::{
         CheatSpan, ContractClassTrait, DeclareResultTrait, EventSpyAssertionsTrait,
-        cheat_caller_address, declare, spy_events, start_cheat_caller_address,
-        stop_cheat_caller_address,cheat_block_timestamp
+        cheat_block_timestamp, cheat_caller_address, declare, spy_events,
+        start_cheat_caller_address, stop_cheat_caller_address,
     };
     use starknet::class_hash::ClassHash;
     use starknet::testing::{set_caller_address, set_contract_address};
