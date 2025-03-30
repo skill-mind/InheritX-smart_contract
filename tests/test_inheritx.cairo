@@ -4,7 +4,6 @@ mod tests {
     use inheritx::interfaces::IInheritX::{
         AssetAllocation, IInheritX, IInheritXDispatcher, IInheritXDispatcherTrait,
     };
-
     use inheritx::types::{ActivityType, SecuritySettings};
     use snforge_std::{
         CheatSpan, ContractClassTrait, DeclareResultTrait, EventSpyAssertionsTrait,

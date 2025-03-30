@@ -1,7 +1,7 @@
 use starknet::ContractAddress;
 use crate::types::{
-    ActivityRecord, ActivityType, NotificationSettings, NotificationStruct, SimpleBeneficiary,
-    UserProfile, SecuritySettings,
+    ActivityRecord, ActivityType, NotificationSettings, NotificationStruct, SecuritySettings,
+    SimpleBeneficiary, UserProfile,
 };
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
