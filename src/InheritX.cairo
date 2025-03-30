@@ -12,9 +12,9 @@ pub mod InheritX {
     };
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
     use crate::types::{
-        ActivityRecord, ActivityType, MediaMessage, NotificationSettings, PlanConditions,
-        PlanOverview, PlanSection, PlanStatus, SecuritySettings, SimpleBeneficiary, TokenAllocation,
-        TokenInfo, UserProfile, UserRole, VerificationStatus, NotificationStruct
+        ActivityRecord, ActivityType, MediaMessage, NotificationSettings, NotificationStruct,
+        PlanConditions, PlanOverview, PlanSection, PlanStatus, SecuritySettings, SimpleBeneficiary,
+        TokenAllocation, TokenInfo, UserProfile, UserRole, VerificationStatus,
     };
 
     #[storage]

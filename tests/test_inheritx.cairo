@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod tests {
+    use inheritx::InheritX::InheritX;
     use inheritx::interfaces::IInheritX::{
         AssetAllocation, IInheritX, IInheritXDispatcher, IInheritXDispatcherTrait,
     };
-    use inheritx::InheritX::InheritX;
     use inheritx::types::{
         ActivityType, MediaMessage, PlanConditions, PlanOverview, PlanSection, PlanStatus,
         SimpleBeneficiary, TokenInfo, UserProfile,
