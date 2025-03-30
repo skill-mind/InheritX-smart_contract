@@ -1,7 +1,7 @@
 use starknet::ContractAddress;
 use crate::types::{
     ActivityRecord, ActivityType, NotificationSettings, NotificationStruct, PlanOverview,
-    PlanSection, SimpleBeneficiary, TokenInfo, UserProfile,
+    PlanSection, SecuritySettings, SimpleBeneficiary, TokenInfo, UserProfile,
 };
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
@@ -128,4 +128,6 @@ pub trait IInheritX<TContractState> {
     ) -> NotificationStruct;
 
     fn delete_user_profile(ref self: TContractState, address: ContractAddress) -> bool;
+
+    fn update_security_settings(ref self: TContractState, new_settings: SecuritySettings) -> bool;
 }
