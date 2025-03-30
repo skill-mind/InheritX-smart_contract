@@ -30,6 +30,7 @@ pub struct MediaMessage {
 #[starknet::interface]
 pub trait IInheritX<TContractState> {
     // Initialize a new claim with a claim code
+
     fn create_claim(
         ref self: TContractState,
         name: felt252,
@@ -99,5 +100,20 @@ pub trait IInheritX<TContractState> {
         full_name: felt252,
         profile_image: felt252,
     ) -> bool;
+    
     fn get_profile(ref self: TContractState, address: ContractAddress) -> UserProfile;
+
+    fn initiate_recovery(
+        ref self: TContractState, 
+        user: ContractAddress, 
+        recovery_method: felt252
+    ) -> felt252;
+
+    fn verify_recovery_code(
+        ref self: TContractState, 
+        user: ContractAddress, 
+        recovery_code: felt252
+    ) -> bool;
+
+    fn generate_recovery_code ( ref self: TContractState, user: ContractAddress) -> felt252;
 }
