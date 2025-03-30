@@ -256,6 +256,34 @@ pub mod InheritX {
             plan_id
         }
 
+        fn add_beneficiary_to_plan(
+            ref self: ContractState,
+            plan_id: u256,
+            new_beneficiaries: Array<ContractAddress>
+        ) {
+            let last_plan_id = self.plans_id.read();
+            assert(plan_id <= last_plan_id, 'Invalid plan id');
+
+            let new_beneficiaries_count = new_beneficiaries.len();
+            assert(new_beneficiaries_count > 0, 'Count cannot be zero');
+
+            let plan_beneficiaries_count = self.plan_beneficiaries_count.read(plan_id);
+
+            // Store beneficiaries
+            let mut new_beneficiary_index: u32 = plan_beneficiaries_count;
+            let mut i = 0;
+
+            while i < new_beneficiaries_count {
+                let new_beneficiary = *new_beneficiaries.at(i);
+                self.plan_beneficiaries.write((plan_id, new_beneficiary_index), new_beneficiary);
+                self.is_beneficiary.write((plan_id, new_beneficiary), true);
+                new_beneficiary_index += 1;
+                i += 1;
+            }
+
+            self.plan_beneficiaries_count.write(plan_id, plan_beneficiaries_count + new_beneficiaries_count);
+        }
+
         fn create_claim(
             ref self: ContractState,
             name: felt252,
