@@ -542,6 +542,8 @@ pub mod InheritX {
             self.plan_status.write(plan_id, PlanStatus::Cancelled);
             // 6. Emit PlanOverridden event
             self.emit(PlanOverridden { plan_id, caller });
+        }
+        
         fn update_notification(
             ref self: ContractState,
             user: ContractAddress,
