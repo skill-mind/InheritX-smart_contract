@@ -4,12 +4,10 @@ mod tests {
     use inheritx::interfaces::IInheritX::{
         AssetAllocation, IInheritX, IInheritXDispatcher, IInheritXDispatcherTrait,
     };
-    
     use inheritx::types::{
         ActivityType, MediaMessage, PlanConditions, PlanOverview, PlanSection, PlanStatus,
-        SimpleBeneficiary, TokenInfo, UserProfile, SecuritySettings,
+        SecuritySettings, SimpleBeneficiary, TokenInfo, UserProfile,
     };
-
     use snforge_std::{
         CheatSpan, ContractClassTrait, DeclareResultTrait, EventSpyAssertionsTrait,
         cheat_caller_address, declare, spy_events, start_cheat_caller_address,

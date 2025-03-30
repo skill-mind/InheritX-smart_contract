@@ -1,9 +1,7 @@
 use starknet::ContractAddress;
-
 use crate::types::{
     ActivityRecord, ActivityType, NotificationSettings, NotificationStruct, PlanOverview,
-    PlanSection, SimpleBeneficiary, TokenInfo, UserProfile, SecuritySettings,
-
+    PlanSection, SecuritySettings, SimpleBeneficiary, TokenInfo, UserProfile,
 };
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
