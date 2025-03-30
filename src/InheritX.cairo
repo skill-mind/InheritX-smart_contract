@@ -564,6 +564,7 @@ pub mod InheritX {
             } else {
                 return false;
             }
+
         }
 
         fn update_notification(
