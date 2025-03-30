@@ -5,16 +5,13 @@ mod tests {
         AssetAllocation, IInheritX, IInheritXDispatcher, IInheritXDispatcherTrait,
     };
     use inheritx::types::{
-        ActivityType, NotificationSettings, NotificationStruct, SecuritySettings, UserProfile,
-        UserRole, VerificationStatus,
+        ActivityType, MediaMessage, NotificationSettings, NotificationStruct, PlanConditions,
+        PlanOverview, PlanSection, PlanStatus, SecuritySettings, SimpleBeneficiary, TokenInfo,
+        UserProfile, UserRole, VerificationStatus,
     };
     use snforge_std::{
         CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_caller_address, declare,
         start_cheat_block_timestamp, start_cheat_caller_address, stop_cheat_caller_address,
-        ActivityType, MediaMessage, PlanConditions, PlanOverview, PlanSection, PlanStatus,
-        SecuritySettings, SimpleBeneficiary, TokenInfo, UserProfile,
-    };
- 
     };
     use starknet::class_hash::ClassHash;
     use starknet::testing::{set_caller_address, set_contract_address};
@@ -311,7 +308,7 @@ mod tests {
         );
 
         stop_cheat_caller_address(contract_address);
-=======
+    }
     // Helper function to setup contract with a test plan
     fn setup_with_plan() -> (IInheritXDispatcher, u256, ContractAddress) {
         let (IInheritXDispatcher, contract_address) = setup();

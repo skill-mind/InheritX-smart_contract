@@ -12,7 +12,6 @@ pub mod InheritX {
     };
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
     use crate::types::{
-
         ActivityRecord, ActivityType, MediaMessage, NotificationSettings, NotificationStruct,
         PlanConditions, PlanOverview, PlanSection, PlanStatus, SecuritySettings, SimpleBeneficiary,
         TokenAllocation, TokenInfo, UserProfile, UserRole, VerificationStatus,
@@ -85,7 +84,6 @@ pub mod InheritX {
         verification_attempts: Map<ContractAddress, u8>,
         verification_expiry: Map<ContractAddress, u64>,
         user_profiles: Map<ContractAddress, UserProfile>,
-
         // storage mappings for notification
         user_notifications: Map<ContractAddress, NotificationStruct>,
     }

@@ -1,6 +1,5 @@
 use starknet::ContractAddress;
 use crate::types::{
-
     ActivityRecord, ActivityType, NotificationSettings, NotificationStruct, PlanOverview,
     PlanSection, SecuritySettings, SimpleBeneficiary, TokenInfo, UserProfile,
 };
