@@ -1,7 +1,7 @@
 use starknet::ContractAddress;
 use crate::types::{
-    ActivityRecord, ActivityType, NotificationSettings, NotificationStruct, SimpleBeneficiary,
-    UserProfile,
+    ActivityRecord, ActivityType, NotificationSettings, NotificationStruct, PlanOverview,
+    PlanSection, SecuritySettings, SimpleBeneficiary, TokenInfo, UserProfile, Wallet,
 };
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
@@ -86,6 +86,7 @@ pub trait IInheritX<TContractState> {
     ) -> ActivityRecord;
 
     fn retrieve_claim(ref self: TContractState, inheritance_id: u256) -> SimpleBeneficiary;
+    fn get_plan_section(self: @TContractState, plan_id: u256, section: PlanSection) -> PlanOverview;
     fn transfer_funds(ref self: TContractState, beneficiary: ContractAddress, amount: u256);
     fn test_deployment(ref self: TContractState) -> bool;
  feat/getTotalActivity
@@ -141,5 +142,39 @@ pub trait IInheritX<TContractState> {
  main
 
     fn delete_user_profile(ref self: TContractState, address: ContractAddress) -> bool;
+ feat/getTotalActivity
+ main
+
+    fn update_user_profile(
+        ref self: TContractState,
+        username: felt252,
+        email: felt252,
+        full_name: felt252,
+        profile_image: felt252,
+        notification_settings: NotificationSettings,
+        security_settings: SecuritySettings,
+    ) -> bool;
+
+    fn _update_notification_settings(
+        ref self: TContractState, user: ContractAddress, settings: NotificationSettings,
+    );
+
+    fn _record_activity(
+        ref self: TContractState,
+        user: ContractAddress,
+        activity_type: ActivityType,
+        details: felt252,
+    );
+
+    fn get_user_profile(self: @TContractState, user: ContractAddress) -> UserProfile;
+
+    fn update_security_settings(ref self: TContractState, new_settings: SecuritySettings) -> bool;
+
+
+    // New Wallet Management Methods
+    fn add_wallet(ref self: TContractState, wallet: ContractAddress, wallet_type: felt252) -> bool;
+    fn set_primary_wallet(ref self: TContractState, wallet: ContractAddress) -> bool;
+    fn get_primary_wallet(self: @TContractState, user: ContractAddress) -> ContractAddress;
+    fn get_user_wallets(self: @TContractState, user: ContractAddress) -> Array<Wallet>;
  main
 }
