@@ -1,5 +1,6 @@
 #[starknet::contract]
 pub mod InheritX {
+    use core::array::ArrayTrait;
     use core::num::traits::Zero;
     use core::traits::Into;
     use starknet::storage::{
@@ -14,7 +15,7 @@ pub mod InheritX {
     use crate::types::{
         ActivityRecord, ActivityType, MediaMessage, NotificationSettings, NotificationStruct,
         PlanConditions, PlanOverview, PlanSection, PlanStatus, SecuritySettings, SimpleBeneficiary,
-        TokenAllocation, TokenInfo, UserProfile, UserRole, VerificationStatus,
+        TokenAllocation, TokenInfo, UserProfile, UserRole, VerificationStatus, Wallet,
     };
 
     #[storage]
@@ -86,6 +87,11 @@ pub mod InheritX {
         user_profiles: Map<ContractAddress, UserProfile>,
         // storage mappings for notification
         user_notifications: Map<ContractAddress, NotificationStruct>,
+        // Updated wallet-related storage mappings
+        user_wallets_length: Map<ContractAddress, u256>,
+        user_wallets: Map<(ContractAddress, u256), Wallet>,
+        user_primary_wallet: Map<ContractAddress, ContractAddress>,
+        total_user_wallets: Map<ContractAddress, u256>,
     }
 
     // Response-only struct (not stored)
@@ -714,6 +720,160 @@ pub mod InheritX {
             true
         }
 
+        fn update_user_profile(
+            ref self: ContractState,
+            username: felt252,
+            email: felt252,
+            full_name: felt252,
+            profile_image: felt252,
+            notification_settings: NotificationSettings,
+            security_settings: SecuritySettings,
+        ) -> bool {
+            // Get the caller's address
+            let caller = get_caller_address();
+
+            // Check if the profile exists
+            let mut profile = self.user_profiles.read(caller);
+
+            // Ensure the profile belongs to the caller
+            assert(profile.address == caller || profile.address.is_zero(), 'Not authorized');
+
+            // Update profile fields
+            profile.address = caller;
+            profile.username = username;
+            profile.email = email;
+            profile.full_name = full_name;
+            profile.profile_image = profile_image;
+            profile.notification_settings = notification_settings;
+            profile.security_settings = security_settings;
+            profile.last_active = get_block_timestamp();
+
+            // If this is a new profile, set creation date
+            if profile.created_at.is_zero() {
+                profile.created_at = get_block_timestamp();
+                // Set default role for new profiles
+                profile.role = UserRole::User;
+                profile.verification_status = VerificationStatus::Unverified;
+            }
+
+            // Save updated profile
+            self.user_profiles.write(caller, profile);
+
+            // Record this activity
+            self._record_activity(caller, ActivityType::ProfileUpdate, 'Profile updated');
+
+            // Update notification settings if provided
+            let ns = notification_settings;
+            match ns {
+                NotificationSettings::Nil => (),
+                _ => self._update_notification_settings(caller, ns),
+            }
+
+            true
+        }
+
+        // Helper function to update notification settings
+        fn _update_notification_settings(
+            ref self: ContractState, user: ContractAddress, settings: NotificationSettings,
+        ) {
+            // Convert the enum to a struct for storage
+            let notification_struct = match settings {
+                NotificationSettings::Default => NotificationStruct {
+                    email_notifications: true,
+                    push_notifications: true,
+                    claim_alerts: true,
+                    plan_updates: true,
+                    security_alerts: true,
+                    marketing_updates: false,
+                },
+                NotificationSettings::Nil => NotificationStruct {
+                    email_notifications: false,
+                    push_notifications: false,
+                    claim_alerts: false,
+                    plan_updates: false,
+                    security_alerts: false,
+                    marketing_updates: false,
+                },
+                NotificationSettings::email_notifications => NotificationStruct {
+                    email_notifications: true,
+                    push_notifications: false,
+                    claim_alerts: false,
+                    plan_updates: false,
+                    security_alerts: false,
+                    marketing_updates: false,
+                },
+                NotificationSettings::push_notifications => NotificationStruct {
+                    email_notifications: false,
+                    push_notifications: true,
+                    claim_alerts: false,
+                    plan_updates: false,
+                    security_alerts: false,
+                    marketing_updates: false,
+                },
+                NotificationSettings::claim_alerts => NotificationStruct {
+                    email_notifications: false,
+                    push_notifications: false,
+                    claim_alerts: true,
+                    plan_updates: false,
+                    security_alerts: false,
+                    marketing_updates: false,
+                },
+                NotificationSettings::plan_updates => NotificationStruct {
+                    email_notifications: false,
+                    push_notifications: false,
+                    claim_alerts: false,
+                    plan_updates: true,
+                    security_alerts: false,
+                    marketing_updates: false,
+                },
+                NotificationSettings::security_alerts => NotificationStruct {
+                    email_notifications: false,
+                    push_notifications: false,
+                    claim_alerts: false,
+                    plan_updates: false,
+                    security_alerts: true,
+                    marketing_updates: false,
+                },
+                NotificationSettings::marketing_updates => NotificationStruct {
+                    email_notifications: false,
+                    push_notifications: false,
+                    claim_alerts: false,
+                    plan_updates: false,
+                    security_alerts: false,
+                    marketing_updates: true,
+                },
+            };
+
+            self.user_notifications.write(user, notification_struct);
+        }
+
+        // Helper function to record user activity
+        fn _record_activity(
+            ref self: ContractState,
+            user: ContractAddress,
+            activity_type: ActivityType,
+            details: felt252,
+        ) {
+            let current_pointer = self.user_activities_pointer.read(user);
+            let next_pointer = current_pointer + 1_u256;
+
+            let activity = ActivityRecord {
+                timestamp: get_block_timestamp(),
+                activity_type: activity_type,
+                details: details,
+                ip_address: 0, // We can't get IP in Cairo, so using 0
+                device_info: 0 // We can't get device info in Cairo, so using 0
+            };
+
+            // Fix: Use entry() pattern for nested maps
+            self.user_activities.entry(user).entry(current_pointer).write(activity);
+            self.user_activities_pointer.write(user, next_pointer);
+        }
+
+
+        fn get_user_profile(self: @ContractState, user: ContractAddress) -> UserProfile {
+            self.user_profiles.read(user)
+        }
         fn update_security_settings(
             ref self: ContractState, new_settings: SecuritySettings,
         ) -> bool {
@@ -725,6 +885,93 @@ pub mod InheritX {
             self.user_profiles.write(caller, profile);
 
             true
+        }
+
+        // Wallet Management Functions
+        fn add_wallet(
+            ref self: ContractState, wallet: ContractAddress, wallet_type: felt252,
+        ) -> bool {
+            assert!(wallet != starknet::contract_address_const::<0>(), "Invalid wallet address");
+            let user = get_caller_address();
+            let length = self.user_wallets_length.read(user);
+
+            //
+            let mut wallet_exists = false;
+            let mut i = 0;
+            while i < length {
+                let w = self.user_wallets.read((user, i));
+                if w.address == wallet {
+                    wallet_exists = true;
+                    break;
+                }
+                i += 1;
+            }
+            assert!(!wallet_exists, "Wallet already exists");
+
+            let new_wallet = Wallet {
+                address: wallet,
+                is_primary: length == 0,
+                wallet_type,
+                added_at: get_block_timestamp(),
+            };
+            self.user_wallets.write((user, length), new_wallet);
+            self.user_wallets_length.write(user, length + 1);
+
+            if length == 0 {
+                self.user_primary_wallet.write(user, wallet);
+            }
+
+            let total_wallets = self.total_user_wallets.read(user);
+            self.total_user_wallets.write(user, total_wallets + 1);
+
+            true
+        }
+
+        fn set_primary_wallet(ref self: ContractState, wallet: ContractAddress) -> bool {
+            let user = get_caller_address();
+            let length = self.user_wallets_length.read(user);
+
+            let mut wallet_found = false;
+            let mut wallet_index = 0;
+            let mut i = 0;
+            while i < length {
+                let w = self.user_wallets.read((user, i));
+                if w.address == wallet {
+                    wallet_found = true;
+                    wallet_index = i;
+                    break;
+                }
+                i += 1;
+            }
+            assert!(wallet_found, "Wallet not found");
+
+            i = 0;
+            while i < length {
+                let mut w = self.user_wallets.read((user, i));
+                w.is_primary = (i == wallet_index);
+                self.user_wallets.write((user, i), w);
+                i += 1;
+            }
+
+            self.user_primary_wallet.write(user, wallet);
+
+            true
+        }
+
+        fn get_primary_wallet(self: @ContractState, user: ContractAddress) -> ContractAddress {
+            self.user_primary_wallet.read(user)
+        }
+
+        fn get_user_wallets(self: @ContractState, user: ContractAddress) -> Array<Wallet> {
+            let length = self.user_wallets_length.read(user);
+            let mut wallets = ArrayTrait::new();
+            let mut i = 0;
+            while i < length {
+                let wallet = self.user_wallets.read((user, i));
+                core::array::ArrayTrait::append(ref wallets, wallet);
+                i += 1;
+            }
+            wallets
         }
     }
 }

@@ -159,7 +159,7 @@ pub struct WalletInfo {
     pub added_date: u64,
 }
 
-#[derive(Drop, Serde, starknet::Store, Default)]
+#[derive(Drop, Serde, Copy, starknet::Store, Default)]
 pub enum NotificationSettings {
     #[default]
     Default,
@@ -242,6 +242,7 @@ pub struct ActivityRecord {
     pub ip_address: felt252,
     pub device_info: felt252,
 }
+
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct NotificationStruct {
     pub email_notifications: bool,
@@ -251,3 +252,11 @@ pub struct NotificationStruct {
     pub security_alerts: bool,
     pub marketing_updates: bool,
 }
+#[derive(Drop, Serde, starknet::Store)]
+pub struct Wallet {
+    pub address: ContractAddress,
+    pub is_primary: bool,
+    pub wallet_type: felt252,
+    pub added_at: u64,
+}
+
