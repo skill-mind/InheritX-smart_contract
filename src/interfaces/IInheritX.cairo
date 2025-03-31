@@ -89,6 +89,12 @@ pub trait IInheritX<TContractState> {
     fn get_plan_section(self: @TContractState, plan_id: u256, section: PlanSection) -> PlanOverview;
     fn transfer_funds(ref self: TContractState, beneficiary: ContractAddress, amount: u256);
     fn test_deployment(ref self: TContractState) -> bool;
+    // fn get_total_plans(self: @TContractState) -> u256;
+    
+    // Media Preview
+    fn get_media_preview_url(self: @TContractState, plan_id: u256, file_hash: felt252) -> felt252;
+
+}
     fn is_verified(self: @TContractState, user: ContractAddress) -> bool;
     // fn generate_verification_code(ref self: TContractState, user: ContractAddress) -> felt252;
     fn complete_verififcation(ref self: TContractState, user: ContractAddress, code: felt252);

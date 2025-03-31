@@ -52,6 +52,19 @@ pub mod InheritX {
         pub plans_id: u256,
         balances: Map<ContractAddress, u256>,
         deployed: bool,
+
+        // Plan management
+        plans_count: u256,
+
+        // New storage mapping to track the preview URLs for media files in each plan.
+        plan_media_preview_urls: Map<(u256, felt252), felt252>, // (plan_id, file_hash) -> preview_url
+    }
+
+    #[event]
+    #[derive(Drop, starknet::Event)]
+    enum Event {
+        BeneficiaryAdded: BeneficiaryAdded,
+        ActivityRecordEvent: ActivityRecordEvent,
         inheritance_plans: Map<u256, InheritancePlan>,
         plan_guardians: Map<(u256, u8), ContractAddress>,
         plan_assets: Map<(u256, u8), AssetAllocation>,
@@ -699,6 +712,26 @@ pub mod InheritX {
             true
         }
 
+        // fn get_total_plans(self: @ContractState) -> u256 {
+        //     self.total_plans.read()
+        // }
+
+        fn get_media_preview_url(
+            self: @ContractState, plan_id: u256, file_hash: felt252
+        ) -> felt252 {
+            // 1. Assert plan_id exists
+            let plans_count = self.plans_count.read();
+            assert(plan_id < plans_count, 'Plan does not exist');
+    
+            // 2. Assert file_hash is not zero
+            assert(file_hash != 0, 'Invalid file hash');
+    
+            // 3. Retrieve preview URL from storage
+            let preview_url = self.plan_media_preview_urls.read((plan_id, file_hash));
+            assert(preview_url != 0, 'File not found in plan');
+    
+            // 4. Return the preview URL
+            preview_url
         fn update_user_profile(
             ref self: ContractState,
             username: felt252,
