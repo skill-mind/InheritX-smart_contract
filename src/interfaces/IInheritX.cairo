@@ -1,7 +1,7 @@
 use starknet::ContractAddress;
 use crate::types::{
     ActivityRecord, ActivityType, NotificationSettings, NotificationStruct, PlanOverview,
-    PlanSection, SecuritySettings, SimpleBeneficiary, TokenInfo, UserProfile, Wallet,
+    PlanSection, SecuritySettings, SimpleBeneficiary, TokenInfo, UserProfile, MediaMessage
 };
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
@@ -23,12 +23,12 @@ pub struct AssetAllocation {
     pub percentage: u8,
 }
 
-#[derive(Copy, Drop, Serde)]
-pub struct MediaMessage {
-    pub plan_id: felt252,
-    pub media_type: felt252,
-    pub media_content: felt252,
-}
+// #[derive(Copy, Drop, Serde)]
+// pub struct MediaMessage {
+//     pub plan_id: felt252,
+//     pub media_type: felt252,
+//     pub media_content: felt252,
+// }
 
 #[starknet::interface]
 pub trait IInheritX<TContractState> {
@@ -57,6 +57,20 @@ pub trait IInheritX<TContractState> {
         description: felt252,
         pick_beneficiaries: Array<ContractAddress>,
     ) -> u256;
+    
+    fn add_beneficiary_to_plan(
+        ref self: TContractState,
+        plan_id: u256,
+        new_beneficiaries: Array<ContractAddress>
+    );
+
+    fn add_media_file_to_plan(
+        ref self: TContractState,
+        plan_id: u256,
+        media_file: MediaMessage,
+        recipient: ContractAddress,
+    );
+    
     // Getters
     fn get_inheritance_plan(ref self: TContractState, plan_id: u256) -> InheritancePlan;
     fn add_beneficiary(
@@ -152,11 +166,4 @@ pub trait IInheritX<TContractState> {
     fn get_user_profile(self: @TContractState, user: ContractAddress) -> UserProfile;
 
     fn update_security_settings(ref self: TContractState, new_settings: SecuritySettings) -> bool;
-
-
-    // New Wallet Management Methods
-    fn add_wallet(ref self: TContractState, wallet: ContractAddress, wallet_type: felt252) -> bool;
-    fn set_primary_wallet(ref self: TContractState, wallet: ContractAddress) -> bool;
-    fn get_primary_wallet(self: @TContractState, user: ContractAddress) -> ContractAddress;
-    fn get_user_wallets(self: @TContractState, user: ContractAddress) -> Array<Wallet>;
 }
