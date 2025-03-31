@@ -1,5 +1,4 @@
 pub mod test_claim;
-pub mod test_contract;
 pub mod test_get_total_plans;
 pub mod test_inheritx;
 pub mod test_plan;

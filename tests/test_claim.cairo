@@ -1,12 +1,14 @@
 // Import the contract modules
-use inheritx::imple::InheritXClaim::InheritxClaim;
-use inheritx::imple::InheritXPlan::InheritxPlan;
-use inheritx::interfaces::IInheritX::{IInheritX, IInheritXDispatcher, IInheritXDispatcherTrait};
+use inheritx::interfaces::IInheritX::{
+    AssetAllocation, IInheritX, IInheritXDispatcher, IInheritXDispatcherTrait,
+};
+use inheritx::types::ActivityType;
 use snforge_std::{CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_caller_address, declare};
 use starknet::ContractAddress;
 use starknet::class_hash::ClassHash;
 use starknet::contract_address::contract_address_const;
 use starknet::testing::{set_caller_address, set_contract_address};
+
 
 fn setup() -> ContractAddress {
     let declare_result = declare("InheritX");
@@ -225,4 +227,69 @@ fn test_collect_create_profile() {
     assert(new_profile.full_name == fullname, ' Wrong fullname');
     assert(new_profile.profile_image == image, ' Wrong image');
     assert(new_profile.address == caller, ' Wrong Owner');
+}
+
+
+#[test]
+fn test_delete_profile() {
+    let contract_address = setup();
+    let dispatcher = IInheritXDispatcher { contract_address };
+    let caller: ContractAddress = contract_address_const::<'benefactor'>();
+
+    // Test input values
+    let username: felt252 = 'John1234';
+    let email: felt252 = 'John@yahoo.com';
+    let fullname = 'John Doe';
+    let image = 'image';
+
+    // Ensure the caller is the admin
+    cheat_caller_address(contract_address, caller, CheatSpan::Indefinite);
+
+    // Call create_claim
+    let claim_id = dispatcher.create_profile(username, email, fullname, image);
+
+    // Validate that the claim ID is correctly incremented
+
+    cheat_caller_address(contract_address, caller, CheatSpan::Indefinite);
+    let success = dispatcher.delete_user_profile(caller);
+    assert(success, 'Deletion Failed');
+    let new_profile = dispatcher.get_profile(caller);
+
+    assert(new_profile.username == ' ', 'Wrong Username');
+    assert(new_profile.email == ' ', ' Wrong email');
+    assert(new_profile.full_name == ' ', ' Wrong fullname');
+    assert(new_profile.profile_image == ' ', ' Wrong image');
+}
+
+#[test]
+#[should_panic(expected: 'No right to delete')]
+fn test_non_authorized_delete_profile() {
+    let contract_address = setup();
+    let dispatcher = IInheritXDispatcher { contract_address };
+    let caller: ContractAddress = contract_address_const::<'benefactor'>();
+    let malicious: ContractAddress = contract_address_const::<'malicious'>();
+
+    // Test input values
+    let username: felt252 = 'John1234';
+    let email: felt252 = 'John@yahoo.com';
+    let fullname = 'John Doe';
+    let image = 'image';
+
+    // Ensure the caller is the admin
+    cheat_caller_address(contract_address, caller, CheatSpan::Indefinite);
+
+    // Call create_claim
+    let claim_id = dispatcher.create_profile(username, email, fullname, image);
+
+    // Validate that the claim ID is correctly incremented
+
+    cheat_caller_address(contract_address, malicious, CheatSpan::Indefinite);
+    let success = dispatcher.delete_user_profile(caller);
+    assert(success, 'Deletion Failed');
+    let new_profile = dispatcher.get_profile(caller);
+
+    assert(new_profile.username == ' ', 'Wrong Username');
+    assert(new_profile.email == ' ', ' Wrong email');
+    assert(new_profile.full_name == ' ', ' Wrong fullname');
+    assert(new_profile.profile_image == ' ', ' Wrong image');
 }
