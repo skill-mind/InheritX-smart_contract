@@ -7,8 +7,6 @@ use crate::types::{
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct InheritancePlan {
     pub owner: ContractAddress,
-    // pub time_lock_period: u64,
-    // pub required_guardians: u8,
     pub is_active: bool,
     pub is_claimed: bool,
     pub total_value: u256,

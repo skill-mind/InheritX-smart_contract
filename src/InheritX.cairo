@@ -5,8 +5,8 @@ use starknet::contract_address::ContractAddress;
 
 #[starknet::contract]
 pub mod InheritX {
-    use core::hash::HashStateExTrait;
     use core::array::ArrayTrait;
+    use core::hash::HashStateExTrait;
     use core::num::traits::Zero;
     use core::pedersen::HashState;
     use core::poseidon::{PoseidonTrait, poseidon_hash_span};
