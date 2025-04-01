@@ -1,25 +1,22 @@
-use starknet::contract_address::ContractAddress;
-use core::zeroable;
-use core::pedersen::PedersenTrait;
 use core::array::ArrayTrait;
+use core::pedersen::PedersenTrait;
+use core::zeroable;
+use starknet::contract_address::ContractAddress;
 
 #[starknet::contract]
 pub mod InheritX {
+    use core::hash::HashStateExTrait;
     use core::num::traits::Zero;
     use core::pedersen::HashState;
-    use core::poseidon::poseidon_hash_span;
-    use core::hash::HashStateExTrait;
-    use core::poseidon::PoseidonTrait;
+    use core::poseidon::{PoseidonTrait, poseidon_hash_span};
     use core::traits::Into;
-    
     use starknet::storage::{
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePathEntry,
         StoragePointerReadAccess, StoragePointerWriteAccess,
     };
-    use starknet::{ContractAddress, get_block_timestamp, get_block_number, get_caller_address, get_contract_address};
     use starknet::{
-        ContractAddress, contract_address_const, get_block_timestamp, get_caller_address,
-        get_contract_address,
+        ContractAddress, contract_address_const, get_block_number, get_block_timestamp,
+        get_caller_address, get_contract_address,
     };
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
     use crate::types::{
@@ -79,7 +76,6 @@ pub mod InheritX {
         recovery_code_expiry: Map<ContractAddress, u64>,
         // storage mappings for notification
         user_notifications: Map<ContractAddress, NotificationStruct>,
-
     }
 
     #[derive(Drop, starknet::Event)]
@@ -116,16 +112,16 @@ pub mod InheritX {
         activity_id: u256,
     }
 
-  #[derive(Drop, Serde, Hash)]
-       struct RecoveryData  {
-       user: ContractAddress,
-       timestamp: u64,
-       block_number: u64,
-       salt: felt252,
+    #[derive(Drop, Serde, Hash)]
+    struct RecoveryData {
+        user: ContractAddress,
+        timestamp: u64,
+        block_number: u64,
+        salt: felt252,
     }
-    
+
     //     #[derive(Copy, Drop, Serde)]
-    
+
     //     #[derive(Copy, Drop, Serde)]ze
 
     //  enum VerificationStatus {
@@ -428,7 +424,6 @@ pub mod InheritX {
             email: felt252,
             address: ContractAddress,
         ) -> felt252 {
-        
             let asset_owner = self.plan_asset_owner.read(plan_id);
             assert(asset_owner != address, 'Invalid plan_id');
 
@@ -529,14 +524,13 @@ pub mod InheritX {
         }
 
         fn generate_recovery_code(ref self: ContractState, user: ContractAddress) -> felt252 {
-            
             let recovery_data = RecoveryData {
                 user: user,
                 timestamp: get_block_timestamp(),
                 block_number: get_block_number(),
                 salt: 0x123abc123abc,
             };
-            
+
             let mut recovery_data_array = ArrayTrait::new();
             recovery_data_array.append(recovery_data.user.into());
             recovery_data_array.append(recovery_data.timestamp.into());
@@ -547,61 +541,44 @@ pub mod InheritX {
         }
 
         fn initiate_recovery(
-            ref self: ContractState,
-            user: ContractAddress,
-            recovery_method: felt252
+            ref self: ContractState, user: ContractAddress, recovery_method: felt252,
         ) -> felt252 {
-
             let profile = self.user_profiles.read(user);
-           
+
             assert(!profile.address.is_zero(), 'User profile does not exist');
 
             let recovery_code = self.generate_recovery_code(user);
-        
+
             self.recovery_codes.write(user, recovery_code);
-            self.recovery_code_expiry.write(user, get_block_timestamp() + 3600); 
-        
-            self.record_user_activity(
-                user, 
-                ActivityType::RecoveryInitiated, 
-                recovery_method, 
-                '', 
-                ''
-            );
-        
+            self.recovery_code_expiry.write(user, get_block_timestamp() + 3600);
+
+            self
+                .record_user_activity(
+                    user, ActivityType::RecoveryInitiated, recovery_method, '', '',
+                );
+
             recovery_code
         }
-        
+
 
         fn verify_recovery_code(
-            ref self: ContractState, 
-            user: ContractAddress, 
-            recovery_code: felt252
+            ref self: ContractState, user: ContractAddress, recovery_code: felt252,
         ) -> bool {
-           
             let stored_code = self.recovery_codes.read(user);
             let expiry_time = self.recovery_code_expiry.read(user);
-        
-           
-            let is_valid = (
-                stored_code == recovery_code && 
-                get_block_timestamp() <= expiry_time
-            );
-        
+
+            let is_valid = (stored_code == recovery_code && get_block_timestamp() <= expiry_time);
+
             if is_valid {
-               
                 self.recovery_codes.write(user, 0);
                 self.recovery_code_expiry.write(user, 0);
 
-                self.record_user_activity(
-                    user, 
-                    ActivityType::RecoveryVerified, 
-                    'Recovery code verified', 
-                    '', 
-                    ''
-                );
+                self
+                    .record_user_activity(
+                        user, ActivityType::RecoveryVerified, 'Recovery code verified', '', '',
+                    );
             }
-        
+
             is_valid
         }
         fn update_notification(
@@ -675,8 +652,5 @@ pub mod InheritX {
             true
         }
     }
-     
 }
 
-    
-    

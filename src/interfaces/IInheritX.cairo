@@ -110,22 +110,18 @@ pub trait IInheritX<TContractState> {
         full_name: felt252,
         profile_image: felt252,
     ) -> bool;
-    
+
     fn get_profile(ref self: TContractState, address: ContractAddress) -> UserProfile;
 
     fn initiate_recovery(
-        ref self: TContractState, 
-        user: ContractAddress, 
-        recovery_method: felt252
+        ref self: TContractState, user: ContractAddress, recovery_method: felt252,
     ) -> felt252;
 
     fn verify_recovery_code(
-        ref self: TContractState, 
-        user: ContractAddress, 
-        recovery_code: felt252
+        ref self: TContractState, user: ContractAddress, recovery_code: felt252,
     ) -> bool;
 
-    fn generate_recovery_code ( ref self: TContractState, user: ContractAddress) -> felt252;
+    fn generate_recovery_code(ref self: TContractState, user: ContractAddress) -> felt252;
 
     fn update_notification(
         ref self: TContractState,
@@ -143,5 +139,4 @@ pub trait IInheritX<TContractState> {
     ) -> NotificationStruct;
 
     fn delete_user_profile(ref self: TContractState, address: ContractAddress) -> bool;
-
 }
