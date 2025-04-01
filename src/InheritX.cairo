@@ -1,15 +1,21 @@
 #[starknet::contract]
 pub mod InheritX {
+    use core::array::ArrayTrait;
     use core::num::traits::Zero;
+    use core::traits::Into;
     use starknet::storage::{
-        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePathEntry,
-        StoragePointerReadAccess, StoragePointerWriteAccess,
+        Map, MutableVecTrait, StorageMapReadAccess, StorageMapWriteAccess, StoragePathEntry,
+        StoragePointerReadAccess, StoragePointerWriteAccess, Vec, VecTrait,
     };
-    use starknet::{ContractAddress, get_block_timestamp, get_caller_address, get_contract_address};
+    use starknet::{
+        ContractAddress, contract_address_const, get_block_timestamp, get_caller_address,
+        get_contract_address,
+    };
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
     use crate::types::{
-        ActivityRecord, ActivityType, NotificationSettings, SecuritySettings, SimpleBeneficiary,
-        UserProfile, UserRole, VerificationStatus,
+        ActivityRecord, ActivityType, MediaMessage, NotificationSettings, NotificationStruct,
+        PlanConditions, PlanOverview, PlanSection, PlanStatus, SecuritySettings, SimpleBeneficiary,
+        TokenAllocation, TokenInfo, UserProfile, UserRole, VerificationStatus, Wallet,
     };
 
     #[storage]
@@ -52,9 +58,51 @@ pub mod InheritX {
         plan_guardian_count: Map<u256, u8>,
         plan_asset_count: Map<u256, u8>,
         // storage mappings for plan_name and description
-        plan_names: Map<u256, felt252>,
-        plan_descriptions: Map<u256, felt252>,
+        plan_name: Map<u256, felt252>,
+        plan_description: Map<u256, felt252>,
+        plans_count: u256,
+        beneficiary_details: Map<
+            (u256, ContractAddress), SimpleBeneficiary,
+        >, // (plan_id, beneficiary) -> beneficiary details
+        // Plan details
+        plan_status: Map<u256, PlanStatus>, // plan_id -> status
+        plan_conditions: Map<u256, PlanConditions>, // plan_id -> conditions
+        // Tokens
+        plan_tokens_count: Map<u256, u32>, // plan_id -> tokens_count
+        plan_tokens: Map<(u256, u32), TokenInfo>, // (plan_id, index) -> token_info
+        token_allocations: Map<
+            (u256, ContractAddress, ContractAddress), TokenAllocation,
+        >, // (plan_id, beneficiary, token) -> allocation
+        // Media messages
+        plan_media_messages: Map<(u256, u32), MediaMessage>, // (plan_id, message_index) -> message
+        media_message_recipients: Map<
+            (u256, u32, u32), ContractAddress,
+        >, // (plan_id, message_index, recipient_index) -> address
+        plan_media_messages_count: Map<u256, u32>,
+        //Identity verification system
+        verification_code: Map<ContractAddress, felt252>,
+        verification_status: Map<ContractAddress, bool>,
+        verification_attempts: Map<ContractAddress, u8>,
+        verification_expiry: Map<ContractAddress, u64>,
         user_profiles: Map<ContractAddress, UserProfile>,
+        // storage mappings for notification
+        user_notifications: Map<ContractAddress, NotificationStruct>,
+        // Updated wallet-related storage mappings
+        user_wallets_length: Map<ContractAddress, u256>,
+        user_wallets: Map<(ContractAddress, u256), Wallet>,
+        user_primary_wallet: Map<ContractAddress, ContractAddress>,
+        total_user_wallets: Map<ContractAddress, u256>,
+    }
+
+    // Response-only struct (not stored)
+    #[derive(Drop, Serde)]
+    pub struct MediaMessageResponse {
+        pub file_hash: felt252,
+        pub file_name: felt252,
+        pub file_type: felt252,
+        pub file_size: u64,
+        pub recipients: Array<ContractAddress>, // Only in memory
+        pub upload_date: u64,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -66,11 +114,23 @@ pub mod InheritX {
         email: felt252,
     }
 
+    #[derive(Drop, starknet::Event)]
+    struct NotificationUpdated {
+        email_notifications: bool,
+        push_notifications: bool,
+        claim_alerts: bool,
+        plan_updates: bool,
+        security_alerts: bool,
+        marketing_updates: bool,
+        user: ContractAddress,
+    }
+
     #[event]
     #[derive(Drop, starknet::Event)]
     pub enum Event {
         ActivityRecordEvent: ActivityRecordEvent,
         BeneficiaryAdded: BeneficiaryAdded,
+        NotificationUpdated: NotificationUpdated,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -78,7 +138,7 @@ pub mod InheritX {
         user: ContractAddress,
         activity_id: u256,
     }
-    //     #[derive(Copy, Drop, Serde)]
+    //     #[derive(Copy, Drop, Serde)]ze
     //  enum VerificationStatus {
     //     Unverified,
     //     PendingVerification,
@@ -127,15 +187,15 @@ pub mod InheritX {
                 let asset = tokens.at(i);
                 total_value += *asset.amount;
                 i += 1;
-            };
+            }
 
             // Generate new plan ID
             let plan_id = self.plans_id.read();
             self.plans_id.write(plan_id + 1);
 
             // Store plan details
-            self.plan_names.write(plan_id, plan_name);
-            self.plan_descriptions.write(plan_id, description);
+            self.plan_name.write(plan_id, plan_name);
+            self.plan_description.write(plan_id, description);
             self.plan_asset_owner.write(plan_id, get_caller_address());
             self.plan_creation_date.write(plan_id, get_block_timestamp());
             self.plan_total_value.write(plan_id, total_value);
@@ -159,7 +219,7 @@ pub mod InheritX {
                 self.plan_assets.write((plan_id, asset_index), *tokens.at(i));
                 asset_index += 1;
                 i += 1;
-            };
+            }
             self.plan_asset_count.write(plan_id, asset_count.try_into().unwrap());
 
             // Store beneficiaries
@@ -171,7 +231,7 @@ pub mod InheritX {
                 self.is_beneficiary.write((plan_id, beneficiary), true);
                 beneficiary_index += 1;
                 i += 1;
-            };
+            }
             self.plan_beneficiaries_count.write(plan_id, beneficiary_count);
 
             // Update protocol statistics
@@ -182,13 +242,15 @@ pub mod InheritX {
             let current_tvl = self.total_value_locked.read();
             self.total_value_locked.write(current_tvl + total_value);
 
+            self.plan_status.write(plan_id, PlanStatus::Active);
+
             // Transfer assets to contract
             i = 0;
             while i < asset_count {
                 let asset = tokens.at(i);
                 self.transfer_funds(get_contract_address(), *asset.amount);
                 i += 1;
-            };
+            }
 
             // Return the plan ID
             plan_id
@@ -396,15 +458,6 @@ pub mod InheritX {
             beneficiary
         }
 
-
-        fn is_beneficiary(self: @ContractState, plan_id: u256, address: ContractAddress) -> bool {
-            self.is_beneficiary.read((plan_id, address))
-        }
-
-        fn set_plan_transfer_date(ref self: ContractState, plan_id: u256, date: u64) {
-            self.plan_transfer_date.write(plan_id, date);
-        }
-
         fn get_activity_history(
             self: @ContractState, user: ContractAddress, start_index: u256, page_size: u256,
         ) -> Array<ActivityRecord> {
@@ -430,11 +483,18 @@ pub mod InheritX {
                 activity_history.append(record);
 
                 current_index += 1;
-            };
+            }
 
             activity_history
         }
 
+        fn is_beneficiary(self: @ContractState, plan_id: u256, address: ContractAddress) -> bool {
+            self.is_beneficiary.read((plan_id, address))
+        }
+
+        fn set_plan_transfer_date(ref self: ContractState, plan_id: u256, date: u64) {
+            self.plan_transfer_date.write(plan_id, date);
+        }
         fn get_activity_history_length(self: @ContractState, user: ContractAddress) -> u256 {
             self.user_activities_pointer.entry(user).read()
         }
