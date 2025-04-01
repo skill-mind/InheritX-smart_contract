@@ -86,8 +86,6 @@ pub trait IInheritX<TContractState> {
     fn transfer_funds(ref self: TContractState, beneficiary: ContractAddress, amount: u256);
     fn test_deployment(ref self: TContractState) -> bool;
     fn get_total_assets_value(self: @TContractState) -> u256;
-}
-
 
     fn get_activity_history(
         self: @TContractState, user: ContractAddress, start_index: u256, page_size: u256,
@@ -103,5 +101,4 @@ pub trait IInheritX<TContractState> {
         profile_image: felt252,
     ) -> bool;
     fn get_profile(ref self: TContractState, address: ContractAddress) -> UserProfile;
- main
 }

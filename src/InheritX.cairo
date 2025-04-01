@@ -314,23 +314,19 @@ pub mod InheritX {
             self.deployed.read()
         }
 
- feat/getTotalAsset
         fn get_total_assets_value(self: ContractState) -> u256 {
             let total_plans = self.plans_id.read();
             let mut total_value: u256 = 0;
 
             for inheritance_id in 0..total_plans {
-                match self.funds.try_read(inheritance_id) {
-                    Some(beneficiary) => {
-                        if !beneficiary.claim_status {
-                            total_value += beneficiary.amount;
-                        }
+                if let Some(beneficiary) = self.funds.try_read(inheritance_id) {
+                    if !beneficiary.claim_status {
+                        total_value += beneficiary.amount;
                     }
-                    None => continue, 
                 }
             }
             total_value
-
+        }
         fn add_beneficiary(
             ref self: ContractState,
             plan_id: u256,
@@ -445,7 +441,7 @@ pub mod InheritX {
 
         fn get_total_plans(self: @ContractState) -> u256 {
             self.total_plans.read()
- main
+ 
         }
     }
 }
