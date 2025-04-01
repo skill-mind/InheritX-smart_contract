@@ -390,9 +390,6 @@ pub mod InheritX {
         fn test_deployment(ref self: ContractState) -> bool {
             self.deployed.read()
         }
-
- feat/getTotalActivity
- feat/getTotalAsset
         fn get_total_assets_value(self: ContractState) -> u256 {
             let total_plans = self.plans_id.read();
             let mut total_value: u256 = 0;
@@ -468,7 +465,6 @@ pub mod InheritX {
         /// @param plan_id - The ID of the plan.
         /// @param media_type - The type of media (e.g., 0 for image, 1 for video).
         /// @param media_content - The content of the media (e.g., IPFS hash or URL as felt252).
- main
         fn add_beneficiary(
             ref self: ContractState,
             plan_id: u256,
@@ -581,7 +577,6 @@ pub mod InheritX {
 
         fn get_total_plans(self: @ContractState) -> u256 {
             self.total_plans.read()
- main
         }
         fn update_notification(
             ref self: ContractState,
