@@ -1,4 +1,5 @@
 use starknet::ContractAddress;
+use crate::InheritX::InheritX::MediaMessageResponse;
 
 #[derive(Drop, Serde)]
 pub struct PlanOverview {
@@ -12,6 +13,9 @@ pub struct PlanOverview {
     pub creation_date: u64,
     pub status: PlanStatus,
     pub total_value: u256,
+    // Additional details fields for the plan
+    pub beneficiaries: Array<SimpleBeneficiary>,
+    pub media_messages: Array<MediaMessageResponse>,
 }
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
@@ -50,32 +54,34 @@ pub struct NFTAllocation {
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct PlanConditions {
-    transfer_date: u64,
-    inactivity_period: u64,
-    multi_signature_required: bool,
-    required_approvals: u8,
+    pub transfer_date: u64,
+    pub inactivity_period: u64,
+    pub multi_signature_required: bool,
+    pub required_approvals: u8,
 }
 
-#[derive(Drop, Serde)]
+#[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct MediaMessage {
-    file_hash: felt252,
-    file_name: felt252,
-    file_type: felt252,
-    file_size: u64,
-    recipients: Array<ContractAddress>,
-    upload_date: u64,
+    pub file_hash: felt252,
+    pub file_name: felt252,
+    pub file_type: felt252,
+    pub file_size: u64,
+    pub recipients_count: u32,
+    pub upload_date: u64,
 }
 
-#[derive(Copy, Drop, Serde)]
+#[derive(Copy, Drop, Serde, starknet::Store)]
 pub enum PlanStatus {
+    #[default]
     Draft,
     Active,
     Executed,
     Cancelled,
 }
 
-#[derive(Copy, Drop, Serde)]
+#[derive(Drop, Serde, PartialEq)]
 pub enum PlanSection {
+    #[default]
     BasicInformation: (),
     Beneficiaries: (),
     MediaAndRecipients: (),
@@ -153,7 +159,7 @@ pub struct WalletInfo {
     pub added_date: u64,
 }
 
-#[derive(Drop, Serde, starknet::Store, Default)]
+#[derive(Drop, Serde, Copy, starknet::Store, Default)]
 pub enum NotificationSettings {
     #[default]
     Default,
@@ -166,11 +172,12 @@ pub enum NotificationSettings {
     marketing_updates,
 }
 
-#[derive(Drop, Serde, starknet::Store, Default)]
+#[derive(Drop, Serde, starknet::Store, Default, PartialEq)]
 pub enum SecuritySettings {
     #[default]
     Nil,
     Two_factor_enabled,
+    Two_factor_disabled,
     recovery_email,
     backup_guardians,
     auto_lock_period,
@@ -237,6 +244,7 @@ pub struct ActivityRecord {
     pub ip_address: felt252,
     pub device_info: felt252,
 }
+
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct NotificationStruct {
     pub email_notifications: bool,
@@ -246,3 +254,11 @@ pub struct NotificationStruct {
     pub security_alerts: bool,
     pub marketing_updates: bool,
 }
+#[derive(Drop, Serde, starknet::Store)]
+pub struct Wallet {
+    pub address: ContractAddress,
+    pub is_primary: bool,
+    pub wallet_type: felt252,
+    pub added_at: u64,
+}
+
