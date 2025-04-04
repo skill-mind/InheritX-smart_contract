@@ -70,7 +70,7 @@ pub struct MediaMessage {
     pub upload_date: u64,
 }
 
-#[derive(Copy, Drop, Serde, starknet::Store)]
+#[derive(Copy, Drop, Serde, starknet::Store, PartialEq)]
 pub enum PlanStatus {
     #[default]
     Draft,

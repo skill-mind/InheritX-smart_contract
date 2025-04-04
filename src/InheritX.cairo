@@ -175,6 +175,7 @@ pub mod InheritX {
         ) -> u256 {
             // Validate inputs
             let asset_count = tokens.len();
+
             assert(asset_count > 0, 'No assets specified');
 
             let beneficiary_count = pick_beneficiaries.len();
@@ -194,11 +195,11 @@ pub mod InheritX {
             self.plans_id.write(plan_id + 1);
 
             // Store plan details
-            self.plan_name.write(plan_id, plan_name);
-            self.plan_description.write(plan_id, description);
-            self.plan_asset_owner.write(plan_id, get_caller_address());
-            self.plan_creation_date.write(plan_id, get_block_timestamp());
-            self.plan_total_value.write(plan_id, total_value);
+            self.plan_name.write(plan_id + 1, plan_name);
+            self.plan_description.write(plan_id + 1, description);
+            self.plan_asset_owner.write(plan_id + 1, get_caller_address());
+            self.plan_creation_date.write(plan_id + 1, get_block_timestamp());
+            self.plan_total_value.write(plan_id + 1, total_value);
 
             let new_plan = InheritancePlan {
                 owner: get_caller_address(),
@@ -210,29 +211,28 @@ pub mod InheritX {
                 plan_name,
                 description,
             };
-            self.inheritance_plans.write(plan_id, new_plan);
-
+            self.write_to_inheritance(plan_id + 1, new_plan);
             // Store assets (tokens)
             let mut asset_index: u8 = 0;
             i = 0;
             while i < asset_count {
-                self.plan_assets.write((plan_id, asset_index), *tokens.at(i));
+                self.plan_assets.write((plan_id + 1, asset_index), *tokens.at(i));
                 asset_index += 1;
                 i += 1;
             }
-            self.plan_asset_count.write(plan_id, asset_count.try_into().unwrap());
+            self.write_to_asset_count(plan_id + 1, asset_count);
 
             // Store beneficiaries
             let mut beneficiary_index: u32 = 0;
             i = 0;
             while i < beneficiary_count {
                 let beneficiary = *pick_beneficiaries.at(i);
-                self.plan_beneficiaries.write((plan_id, beneficiary_index), beneficiary);
-                self.is_beneficiary.write((plan_id, beneficiary), true);
+                self.plan_beneficiaries.write((plan_id + 1, beneficiary_index), beneficiary);
+                self.is_beneficiary.write((plan_id + 1, beneficiary), true);
                 beneficiary_index += 1;
                 i += 1;
             }
-            self.plan_beneficiaries_count.write(plan_id, beneficiary_count);
+            self.write_to_beneficiary_count(plan_id + 1, beneficiary_count);
 
             // Update protocol statistics
             let current_total_plans = self.total_plans.read();
@@ -242,7 +242,7 @@ pub mod InheritX {
             let current_tvl = self.total_value_locked.read();
             self.total_value_locked.write(current_tvl + total_value);
 
-            self.plan_status.write(plan_id, PlanStatus::Active);
+            self.write_plan_status(plan_id + 1, PlanStatus::Active);
 
             // Transfer assets to contract
             i = 0;
@@ -252,8 +252,23 @@ pub mod InheritX {
                 i += 1;
             }
 
-            // Return the plan ID
+            // Generate new plan ID
+            self.plans_id.write(plan_id + 1);
+            let plan_id = self.plans_id.read();
             plan_id
+        }
+
+        fn write_plan_status(ref self: ContractState, plan_id: u256, status: PlanStatus) {
+            self.plan_status.write(plan_id, PlanStatus::Active);
+        }
+
+        fn write_to_beneficiary_count(
+            ref self: ContractState, plan_id: u256, beneficiary_count: u32,
+        ) {
+            self.plan_beneficiaries_count.write(plan_id, beneficiary_count);
+        }
+        fn write_to_asset_count(ref self: ContractState, plan_id: u256, asset_count: u32) {
+            self.plan_asset_count.write(plan_id, asset_count.try_into().unwrap());
         }
 
         fn create_claim(
@@ -330,6 +345,10 @@ pub mod InheritX {
         }
         fn get_inheritance_plan(ref self: ContractState, plan_id: u256) -> InheritancePlan {
             self.inheritance_plans.read(plan_id)
+        }
+
+        fn write_to_inheritance(ref self: ContractState, plan_id: u256, new_plan: InheritancePlan) {
+            self.inheritance_plans.write(plan_id, new_plan);
         }
 
         fn record_user_activity(
@@ -951,6 +970,76 @@ pub mod InheritX {
                 i += 1;
             }
             wallets
+        }
+
+        fn is_plan_valid(self: @ContractState, plan_id: u256) -> bool {
+            // Check if plan exists
+            let current_total_plans = self.total_plans.read();
+            if plan_id >= current_total_plans {
+                return false;
+            }
+
+            self.is_valid_plan_status(plan_id);
+
+            self.plan_has_been_claimed(plan_id);
+
+            self.plan_is_active(plan_id);
+
+            self.plan_has_assets(plan_id);
+
+            self.check_beneficiary_plan(plan_id);
+
+            // Plan is valid if it passed all checks
+            true
+        }
+
+
+        fn is_valid_plan_status(self: @ContractState, plan_id: u256) -> bool {
+            // Check plan status - only active plans are valid
+            let status = self.plan_status.read(plan_id);
+            if status != PlanStatus::Active {
+                return false;
+            }
+            return true;
+        }
+
+        fn plan_has_been_claimed(self: @ContractState, plan_id: u256) -> bool {
+            // Retrieve plan from storage
+            let plan = self.inheritance_plans.read(plan_id);
+
+            // Check if plan has been claimed
+            if plan.is_claimed {
+                return false;
+            }
+            return true;
+        }
+
+        fn plan_is_active(self: @ContractState, plan_id: u256) -> bool {
+            // Retrieve plan from storage
+            let plan = self.inheritance_plans.read(plan_id);
+            // Check if plan has been activated
+            if !plan.is_active {
+                return false;
+            }
+            return true;
+        }
+
+        fn plan_has_assets(self: @ContractState, plan_id: u256) -> bool {
+            // Check if plan has assets
+            let asset_count = self.plan_asset_count.read(plan_id);
+            if asset_count == 0 {
+                return false;
+            }
+            return true;
+        }
+        fn check_beneficiary_plan(self: @ContractState, plan_id: u256) -> bool {
+            // Check if plan has beneficiaries
+            let beneficiaries_count = self.plan_beneficiaries_count.read(plan_id);
+            if beneficiaries_count == 0 {
+                return false;
+            }
+            // Plan is valid if it passed all checks
+            true
         }
     }
 }
