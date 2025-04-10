@@ -1,15 +1,23 @@
+use core::array::ArrayTrait;
+use core::pedersen::PedersenTrait;
+use core::zeroable;
+use starknet::contract_address::ContractAddress;
+
 #[starknet::contract]
 pub mod InheritX {
     use core::array::ArrayTrait;
+    use core::hash::HashStateExTrait;
     use core::num::traits::Zero;
+    use core::pedersen::HashState;
+    use core::poseidon::{PoseidonTrait, poseidon_hash_span};
     use core::traits::Into;
     use starknet::storage::{
         Map, MutableVecTrait, StorageMapReadAccess, StorageMapWriteAccess, StoragePathEntry,
         StoragePointerReadAccess, StoragePointerWriteAccess, Vec, VecTrait,
     };
     use starknet::{
-        ContractAddress, contract_address_const, get_block_timestamp, get_caller_address,
-        get_contract_address,
+        ContractAddress, contract_address_const, get_block_number, get_block_timestamp,
+        get_caller_address, get_contract_address,
     };
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
     use crate::types::{
@@ -85,6 +93,8 @@ pub mod InheritX {
         verification_attempts: Map<ContractAddress, u8>,
         verification_expiry: Map<ContractAddress, u64>,
         user_profiles: Map<ContractAddress, UserProfile>,
+        recovery_codes: Map<ContractAddress, felt252>,
+        recovery_code_expiry: Map<ContractAddress, u64>,
         // storage mappings for notification
         user_notifications: Map<ContractAddress, NotificationStruct>,
         // Updated wallet-related storage mappings
@@ -138,7 +148,19 @@ pub mod InheritX {
         user: ContractAddress,
         activity_id: u256,
     }
+
+    #[derive(Drop, Serde, Hash)]
+    struct RecoveryData {
+        user: ContractAddress,
+        timestamp: u64,
+        block_number: u64,
+        salt: felt252,
+    }
+
+    //     #[derive(Copy, Drop, Serde)]
+
     //     #[derive(Copy, Drop, Serde)]ze
+
     //  enum VerificationStatus {
     //     Unverified,
     //     PendingVerification,
@@ -460,31 +482,24 @@ pub mod InheritX {
             email: felt252,
             address: ContractAddress,
         ) -> felt252 {
-            // 1. Check if plan exists by verifying asset owner
             let asset_owner = self.plan_asset_owner.read(plan_id);
             assert(asset_owner != address, 'Invalid plan_id');
 
-            // 2. Verify caller is asset owner
             let caller = starknet::get_caller_address();
             assert(caller == asset_owner, 'Caller is not the asset owner');
 
-            // 3. Check plan state
             assert(self.plan_transfer_date.read(plan_id) == 0, 'Plan is already executed');
 
-            // 4. Validate beneficiary address
             assert(!address.is_zero(), 'Invalid beneficiary address');
             assert(!self.is_beneficiary.read((plan_id, address)), 'Adlready a beneficiary');
 
-            // 5. Validate input data
             assert(name != 0, 'Name cannot be empty');
             assert(email != 0, 'Email cannot be empty');
 
-            // 6. Get and validate beneficiary count
             let current_count: u32 = self.plan_beneficiaries_count.read(plan_id);
             let max_allowed: u32 = self.max_guardians.read().into();
             assert(current_count < max_allowed, 'Exceeds max beneficiaries');
 
-            // 7. Update state
             self.plan_beneficiaries.write((plan_id, current_count), address);
             self.is_beneficiary.write((plan_id, address), true);
             self.plan_beneficiaries_count.write(plan_id, current_count + 1);
@@ -498,7 +513,6 @@ pub mod InheritX {
                     ),
                 );
 
-            // 8. Return the new beneficiary ID
             current_count.into()
         }
 
@@ -536,7 +550,6 @@ pub mod InheritX {
                 start_index + page_size
             };
 
-            // Iterate and collect activity records
             let mut current_index = start_index + 1;
             loop {
                 if current_index > end_index {
@@ -565,6 +578,65 @@ pub mod InheritX {
 
         fn get_total_plans(self: @ContractState) -> u256 {
             self.total_plans.read()
+        }
+
+        fn generate_recovery_code(ref self: ContractState, user: ContractAddress) -> felt252 {
+            let recovery_data = RecoveryData {
+                user: user,
+                timestamp: get_block_timestamp(),
+                block_number: get_block_number(),
+                salt: 0x123abc123abc,
+            };
+
+            let mut recovery_data_array = ArrayTrait::new();
+            recovery_data_array.append(recovery_data.user.into());
+            recovery_data_array.append(recovery_data.timestamp.into());
+            recovery_data_array.append(recovery_data.block_number.into());
+            recovery_data_array.append(recovery_data.salt);
+
+            poseidon_hash_span(recovery_data_array.span())
+        }
+
+        fn initiate_recovery(
+            ref self: ContractState, user: ContractAddress, recovery_method: felt252,
+        ) -> felt252 {
+            let profile = self.user_profiles.read(user);
+
+            assert(!profile.address.is_zero(), 'User profile does not exist');
+
+            let recovery_code = self.generate_recovery_code(user);
+
+            self.recovery_codes.write(user, recovery_code);
+            self.recovery_code_expiry.write(user, get_block_timestamp() + 3600);
+
+            self
+                .record_user_activity(
+                    user, ActivityType::RecoveryInitiated, recovery_method, '', '',
+                );
+
+            recovery_code
+        }
+
+
+        fn verify_recovery_code(
+            ref self: ContractState, user: ContractAddress, recovery_code: felt252,
+        ) -> bool {
+            let stored_code = self.recovery_codes.read(user);
+            let expiry_time = self.recovery_code_expiry.read(user);
+
+            let is_valid = (stored_code == recovery_code && get_block_timestamp() <= expiry_time);
+
+            if is_valid {
+                self.recovery_codes.write(user, 0);
+                self.recovery_code_expiry.write(user, 0);
+
+                self
+                    .record_user_activity(
+                        user, ActivityType::RecoveryVerified, 'Recovery code verified', '', '',
+                    );
+            }
+
+            is_valid
         }
         fn update_notification(
             ref self: ContractState,
@@ -1043,3 +1115,4 @@ pub mod InheritX {
         }
     }
 }
+
