@@ -132,6 +132,11 @@ pub trait IInheritX<TContractState> {
     ) -> NotificationStruct;
 
     fn delete_user_profile(ref self: TContractState, address: ContractAddress) -> bool;
+    fn complete_recovery(
+        ref self: TContractState,
+        user: ContractAddress,
+        recovery_code: felt252,
+    ) -> bool;
     fn update_user_profile(
         ref self: TContractState,
         username: felt252,
