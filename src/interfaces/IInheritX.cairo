@@ -1,7 +1,7 @@
 use starknet::ContractAddress;
 use crate::types::{
     ActivityRecord, ActivityType, NotificationSettings, NotificationStruct, PlanOverview,
-    PlanSection, SecuritySettings, SimpleBeneficiary, TokenInfo, UserProfile, Wallet,
+    PlanSection, PlanStatus, SecuritySettings, SimpleBeneficiary, TokenInfo, UserProfile, Wallet,
 };
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
@@ -66,10 +66,14 @@ pub trait IInheritX<TContractState> {
         email: felt252,
         address: ContractAddress,
     ) -> felt252;
+    fn write_to_inheritance(ref self: TContractState, plan_id: u256, new_plan: InheritancePlan);
+    fn write_to_asset_count(ref self: TContractState, plan_id: u256, asset_count: u32);
     fn is_beneficiary(self: @TContractState, plan_id: u256, address: ContractAddress) -> bool;
+    fn write_plan_status(ref self: TContractState, plan_id: u256, status: PlanStatus);
     fn get_plan_beneficiaries(self: @TContractState, plan_id: u256, index: u32) -> ContractAddress;
     fn get_plan_beneficiaries_count(self: @TContractState, plan_id: u256) -> u32;
     fn set_max_guardians(ref self: TContractState, max_guardian_number: u8);
+    fn write_to_beneficiary_count(ref self: TContractState, plan_id: u256, beneficiary_count: u32);
     fn set_plan_transfer_date(ref self: TContractState, plan_id: u256, date: u64);
     fn set_plan_asset_owner(ref self: TContractState, plan_id: u256, owner: ContractAddress);
     fn record_user_activity(
@@ -176,5 +180,14 @@ pub trait IInheritX<TContractState> {
     fn set_primary_wallet(ref self: TContractState, wallet: ContractAddress) -> bool;
     fn get_primary_wallet(self: @TContractState, user: ContractAddress) -> ContractAddress;
     fn get_user_wallets(self: @TContractState, user: ContractAddress) -> Array<Wallet>;
+ feat/getTotalActivity
+ main
+
+    fn is_plan_valid(self: @TContractState, plan_id: u256) -> bool;
+    fn is_valid_plan_status(self: @TContractState, plan_id: u256) -> bool;
+    fn plan_has_been_claimed(self: @TContractState, plan_id: u256) -> bool;
+    fn plan_is_active(self: @TContractState, plan_id: u256) -> bool;
+    fn plan_has_assets(self: @TContractState, plan_id: u256) -> bool;
+    fn check_beneficiary_plan(self: @TContractState, plan_id: u256) -> bool;
  main
 }
