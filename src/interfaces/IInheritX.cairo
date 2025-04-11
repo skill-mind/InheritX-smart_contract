@@ -93,6 +93,12 @@ pub trait IInheritX<TContractState> {
     fn get_plan_section(self: @TContractState, plan_id: u256, section: PlanSection) -> PlanOverview;
     fn transfer_funds(ref self: TContractState, beneficiary: ContractAddress, amount: u256);
     fn test_deployment(ref self: TContractState) -> bool;
+ feat/getTotalActivity
+    fn get_total_assets_value(self: @TContractState) -> u256;
+}
+
+
+
     fn is_verified(self: @TContractState, user: ContractAddress) -> bool;
     // fn generate_verification_code(ref self: TContractState, user: ContractAddress) -> felt252;
     fn complete_verififcation(ref self: TContractState, user: ContractAddress, code: felt252);
@@ -101,9 +107,12 @@ pub trait IInheritX<TContractState> {
     fn get_verification_status(
         ref self: TContractState, code: felt252, user: ContractAddress,
     ) -> bool;
+ main
     fn get_activity_history(
         self: @TContractState, user: ContractAddress, start_index: u256, page_size: u256,
     ) -> Array<ActivityRecord>;
+
+    fn get_total_activities(self: @ContractState) -> u64
 
     fn get_activity_history_length(self: @TContractState, user: ContractAddress) -> u256;
     fn get_total_plans(self: @TContractState) -> u256;
@@ -115,6 +124,10 @@ pub trait IInheritX<TContractState> {
         profile_image: felt252,
     ) -> bool;
     fn get_profile(ref self: TContractState, address: ContractAddress) -> UserProfile;
+ feat/getTotalActivity
+ feat/getTotalActivity
+ main
+
 
     fn update_notification(
         ref self: TContractState,
@@ -130,8 +143,12 @@ pub trait IInheritX<TContractState> {
     fn get_all_notification_preferences(
         ref self: TContractState, user: ContractAddress,
     ) -> NotificationStruct;
+ main
 
     fn delete_user_profile(ref self: TContractState, address: ContractAddress) -> bool;
+ feat/getTotalActivity
+ main
+
     fn update_user_profile(
         ref self: TContractState,
         username: felt252,
@@ -163,10 +180,14 @@ pub trait IInheritX<TContractState> {
     fn set_primary_wallet(ref self: TContractState, wallet: ContractAddress) -> bool;
     fn get_primary_wallet(self: @TContractState, user: ContractAddress) -> ContractAddress;
     fn get_user_wallets(self: @TContractState, user: ContractAddress) -> Array<Wallet>;
+ feat/getTotalActivity
+ main
+
     fn is_plan_valid(self: @TContractState, plan_id: u256) -> bool;
     fn is_valid_plan_status(self: @TContractState, plan_id: u256) -> bool;
     fn plan_has_been_claimed(self: @TContractState, plan_id: u256) -> bool;
     fn plan_is_active(self: @TContractState, plan_id: u256) -> bool;
     fn plan_has_assets(self: @TContractState, plan_id: u256) -> bool;
     fn check_beneficiary_plan(self: @TContractState, plan_id: u256) -> bool;
+ main
 }
