@@ -1,15 +1,23 @@
+use core::array::ArrayTrait;
+use core::pedersen::PedersenTrait;
+use core::zeroable;
+use starknet::contract_address::ContractAddress;
+
 #[starknet::contract]
 pub mod InheritX {
     use core::array::ArrayTrait;
+    use core::hash::HashStateExTrait;
     use core::num::traits::Zero;
+    use core::pedersen::HashState;
+    use core::poseidon::{PoseidonTrait, poseidon_hash_span};
     use core::traits::Into;
     use starknet::storage::{
         Map, MutableVecTrait, StorageMapReadAccess, StorageMapWriteAccess, StoragePathEntry,
         StoragePointerReadAccess, StoragePointerWriteAccess, Vec, VecTrait,
     };
     use starknet::{
-        ContractAddress, contract_address_const, get_block_timestamp, get_caller_address,
-        get_contract_address,
+        ContractAddress, contract_address_const, get_block_number, get_block_timestamp,
+        get_caller_address, get_contract_address,
     };
     use crate::interfaces::IInheritX::{AssetAllocation, IInheritX, InheritancePlan};
     use crate::types::{
@@ -85,6 +93,8 @@ pub mod InheritX {
         verification_attempts: Map<ContractAddress, u8>,
         verification_expiry: Map<ContractAddress, u64>,
         user_profiles: Map<ContractAddress, UserProfile>,
+        recovery_codes: Map<ContractAddress, felt252>,
+        recovery_code_expiry: Map<ContractAddress, u64>,
         // storage mappings for notification
         user_notifications: Map<ContractAddress, NotificationStruct>,
         // Updated wallet-related storage mappings
@@ -138,7 +148,19 @@ pub mod InheritX {
         user: ContractAddress,
         activity_id: u256,
     }
+
+    #[derive(Drop, Serde, Hash)]
+    struct RecoveryData {
+        user: ContractAddress,
+        timestamp: u64,
+        block_number: u64,
+        salt: felt252,
+    }
+
+    //     #[derive(Copy, Drop, Serde)]
+
     //     #[derive(Copy, Drop, Serde)]ze
+
     //  enum VerificationStatus {
     //     Unverified,
     //     PendingVerification,
@@ -415,31 +437,24 @@ pub mod InheritX {
             email: felt252,
             address: ContractAddress,
         ) -> felt252 {
-            // 1. Check if plan exists by verifying asset owner
             let asset_owner = self.plan_asset_owner.read(plan_id);
             assert(asset_owner != address, 'Invalid plan_id');
 
-            // 2. Verify caller is asset owner
             let caller = starknet::get_caller_address();
             assert(caller == asset_owner, 'Caller is not the asset owner');
 
-            // 3. Check plan state
             assert(self.plan_transfer_date.read(plan_id) == 0, 'Plan is already executed');
 
-            // 4. Validate beneficiary address
             assert(!address.is_zero(), 'Invalid beneficiary address');
             assert(!self.is_beneficiary.read((plan_id, address)), 'Adlready a beneficiary');
 
-            // 5. Validate input data
             assert(name != 0, 'Name cannot be empty');
             assert(email != 0, 'Email cannot be empty');
 
-            // 6. Get and validate beneficiary count
             let current_count: u32 = self.plan_beneficiaries_count.read(plan_id);
             let max_allowed: u32 = self.max_guardians.read().into();
             assert(current_count < max_allowed, 'Exceeds max beneficiaries');
 
-            // 7. Update state
             self.plan_beneficiaries.write((plan_id, current_count), address);
             self.is_beneficiary.write((plan_id, address), true);
             self.plan_beneficiaries_count.write(plan_id, current_count + 1);
@@ -453,7 +468,6 @@ pub mod InheritX {
                     ),
                 );
 
-            // 8. Return the new beneficiary ID
             current_count.into()
         }
 
@@ -491,7 +505,6 @@ pub mod InheritX {
                 start_index + page_size
             };
 
-            // Iterate and collect activity records
             let mut current_index = start_index + 1;
             loop {
                 if current_index > end_index {
@@ -520,7 +533,474 @@ pub mod InheritX {
 
         fn get_total_plans(self: @ContractState) -> u256 {
             self.total_plans.read()
+ feat/getTotalAsset
  
+
+        }
+
+        fn generate_recovery_code(ref self: ContractState, user: ContractAddress) -> felt252 {
+            let recovery_data = RecoveryData {
+                user: user,
+                timestamp: get_block_timestamp(),
+                block_number: get_block_number(),
+                salt: 0x123abc123abc,
+            };
+
+            let mut recovery_data_array = ArrayTrait::new();
+            recovery_data_array.append(recovery_data.user.into());
+            recovery_data_array.append(recovery_data.timestamp.into());
+            recovery_data_array.append(recovery_data.block_number.into());
+            recovery_data_array.append(recovery_data.salt);
+
+            poseidon_hash_span(recovery_data_array.span())
+        }
+
+        fn initiate_recovery(
+            ref self: ContractState, user: ContractAddress, recovery_method: felt252,
+        ) -> felt252 {
+            let profile = self.user_profiles.read(user);
+
+            assert(!profile.address.is_zero(), 'User profile does not exist');
+
+            let recovery_code = self.generate_recovery_code(user);
+
+            self.recovery_codes.write(user, recovery_code);
+            self.recovery_code_expiry.write(user, get_block_timestamp() + 3600);
+
+            self
+                .record_user_activity(
+                    user, ActivityType::RecoveryInitiated, recovery_method, '', '',
+                );
+
+            recovery_code
+        }
+
+
+        fn verify_recovery_code(
+            ref self: ContractState, user: ContractAddress, recovery_code: felt252,
+        ) -> bool {
+            let stored_code = self.recovery_codes.read(user);
+            let expiry_time = self.recovery_code_expiry.read(user);
+
+            let is_valid = (stored_code == recovery_code && get_block_timestamp() <= expiry_time);
+
+            if is_valid {
+                self.recovery_codes.write(user, 0);
+                self.recovery_code_expiry.write(user, 0);
+
+                self
+                    .record_user_activity(
+                        user, ActivityType::RecoveryVerified, 'Recovery code verified', '', '',
+                    );
+            }
+
+            is_valid
+        }
+        fn update_notification(
+            ref self: ContractState,
+            user: ContractAddress,
+            email_notifications: bool,
+            push_notifications: bool,
+            claim_alerts: bool,
+            plan_updates: bool,
+            security_alerts: bool,
+            marketing_updates: bool,
+        ) -> NotificationStruct {
+            let user_notification = self.get_all_notification_preferences(user);
+            let updated_notification = NotificationStruct {
+                email_notifications: email_notifications,
+                push_notifications: push_notifications,
+                claim_alerts: claim_alerts,
+                plan_updates: plan_updates,
+                security_alerts: security_alerts,
+                marketing_updates: marketing_updates,
+            };
+            self.user_notifications.write(user, updated_notification);
+            self
+                .emit(
+                    Event::NotificationUpdated(
+                        NotificationUpdated {
+                            email_notifications,
+                            push_notifications,
+                            claim_alerts,
+                            plan_updates,
+                            security_alerts,
+                            marketing_updates,
+                            user,
+                        },
+                    ),
+                );
+            updated_notification
+        }
+
+        fn get_all_notification_preferences(
+            ref self: ContractState, user: ContractAddress,
+        ) -> NotificationStruct {
+            let notification = self.user_notifications.read(user);
+            notification
+        }
+
+        fn get_plan_section(
+            self: @ContractState, plan_id: u256, section: PlanSection,
+        ) -> PlanOverview {
+            // Assert that the plan_id exists
+            let current_total_plans = self.total_plans.read();
+            assert(plan_id < current_total_plans, 'Plan does not exist');
+
+            // Get all tokens for this plan
+            let tokens_count = self.plan_tokens_count.read(plan_id);
+            let mut tokens = ArrayTrait::new();
+
+            for i in 0..tokens_count {
+                let token_info = self.plan_tokens.read((plan_id, i));
+                tokens.append(token_info);
+            }
+
+            // Create a PlanOverview struct with basic details
+            let mut plan_overview = PlanOverview {
+                plan_id: plan_id,
+                name: self.plan_name.read(plan_id),
+                description: self.plan_description.read(plan_id),
+                tokens_transferred: tokens,
+                transfer_date: self.plan_transfer_date.read(plan_id),
+                inactivity_period: self.plan_conditions.read(plan_id).inactivity_period,
+                multi_signature_enabled: self
+                    .plan_conditions
+                    .read(plan_id)
+                    .multi_signature_required,
+                creation_date: self.plan_creation_date.read(plan_id),
+                status: self.plan_status.read(plan_id),
+                total_value: self.plan_total_value.read(plan_id),
+                beneficiaries: ArrayTrait::new(),
+                media_messages: ArrayTrait::new(),
+            };
+
+            // Fill section-specific details using if statements instead of match
+            if section == PlanSection::BasicInformation { // Basic information is already filled
+            } else if section == PlanSection::Beneficiaries {
+                let beneficiaries_count = self.plan_beneficiaries_count.read(plan_id);
+                let mut beneficiaries: Array<SimpleBeneficiary> = ArrayTrait::new();
+
+                for i in 0..beneficiaries_count {
+                    let beneficiary_address = self.plan_beneficiaries.read((plan_id, i));
+                    let beneficiary_details = self
+                        .beneficiary_details
+                        .read((plan_id, beneficiary_address));
+                    beneficiaries.append(beneficiary_details);
+                }
+                plan_overview.beneficiaries = beneficiaries;
+            } else if section == PlanSection::MediaAndRecipients {
+                let media_messages_count = self.plan_media_messages_count.read(plan_id);
+                let mut media_messages_result = ArrayTrait::new();
+
+                for i in 0..media_messages_count {
+                    let media_message = self.plan_media_messages.read((plan_id, i));
+                    let mut recipients = ArrayTrait::new();
+
+                    // Read each recipient from separate storage
+                    for j in 0..media_message.recipients_count {
+                        let recipient = self.media_message_recipients.read((plan_id, i, j));
+                        recipients.append(recipient);
+                    }
+
+                    // Create response structure (only exists in memory)
+                    let response = MediaMessageResponse {
+                        file_hash: media_message.file_hash,
+                        file_name: media_message.file_name,
+                        file_type: media_message.file_type,
+                        file_size: media_message.file_size,
+                        recipients,
+                        upload_date: media_message.upload_date,
+                    };
+
+                    media_messages_result.append(response);
+                }
+                plan_overview.media_messages = media_messages_result;
+            }
+
+            plan_overview
+        }
+
+        fn delete_user_profile(ref self: ContractState, address: ContractAddress) -> bool {
+            let admin = self.admin.read();
+            let mut user = self.user_profiles.read(address);
+            let caller = user.address;
+
+            assert(
+                get_caller_address() == admin || get_caller_address() == caller,
+                'No right to delete',
+            );
+            // user.address,
+            user.username = ' ';
+            user.address = contract_address_const::<0>();
+            user.email = ' ';
+            user.full_name = ' ';
+            user.profile_image = ' ';
+            user.verification_status = VerificationStatus::Nil;
+            user.role = UserRole::User;
+            user.notification_settings = NotificationSettings::Nil;
+            user.security_settings = SecuritySettings::Nil;
+            user.created_at = 0;
+            user.last_active = 0;
+
+            self.user_profiles.write(caller, user);
+
+            true
+        }
+
+        fn update_user_profile(
+            ref self: ContractState,
+            username: felt252,
+            email: felt252,
+            full_name: felt252,
+            profile_image: felt252,
+            notification_settings: NotificationSettings,
+            security_settings: SecuritySettings,
+        ) -> bool {
+            // Get the caller's address
+            let caller = get_caller_address();
+
+            // Check if the profile exists
+            let mut profile = self.user_profiles.read(caller);
+
+            // Ensure the profile belongs to the caller
+            assert(profile.address == caller || profile.address.is_zero(), 'Not authorized');
+
+            // Update profile fields
+            profile.address = caller;
+            profile.username = username;
+            profile.email = email;
+            profile.full_name = full_name;
+            profile.profile_image = profile_image;
+            profile.notification_settings = notification_settings;
+            profile.security_settings = security_settings;
+            profile.last_active = get_block_timestamp();
+
+            // If this is a new profile, set creation date
+            if profile.created_at.is_zero() {
+                profile.created_at = get_block_timestamp();
+                // Set default role for new profiles
+                profile.role = UserRole::User;
+                profile.verification_status = VerificationStatus::Unverified;
+            }
+
+            // Save updated profile
+            self.user_profiles.write(caller, profile);
+
+            // Record this activity
+            self._record_activity(caller, ActivityType::ProfileUpdate, 'Profile updated');
+
+            // Update notification settings if provided
+            let ns = notification_settings;
+            match ns {
+                NotificationSettings::Nil => (),
+                _ => self._update_notification_settings(caller, ns),
+            }
+
+            true
+        }
+
+        // Helper function to update notification settings
+        fn _update_notification_settings(
+            ref self: ContractState, user: ContractAddress, settings: NotificationSettings,
+        ) {
+            // Convert the enum to a struct for storage
+            let notification_struct = match settings {
+                NotificationSettings::Default => NotificationStruct {
+                    email_notifications: true,
+                    push_notifications: true,
+                    claim_alerts: true,
+                    plan_updates: true,
+                    security_alerts: true,
+                    marketing_updates: false,
+                },
+                NotificationSettings::Nil => NotificationStruct {
+                    email_notifications: false,
+                    push_notifications: false,
+                    claim_alerts: false,
+                    plan_updates: false,
+                    security_alerts: false,
+                    marketing_updates: false,
+                },
+                NotificationSettings::email_notifications => NotificationStruct {
+                    email_notifications: true,
+                    push_notifications: false,
+                    claim_alerts: false,
+                    plan_updates: false,
+                    security_alerts: false,
+                    marketing_updates: false,
+                },
+                NotificationSettings::push_notifications => NotificationStruct {
+                    email_notifications: false,
+                    push_notifications: true,
+                    claim_alerts: false,
+                    plan_updates: false,
+                    security_alerts: false,
+                    marketing_updates: false,
+                },
+                NotificationSettings::claim_alerts => NotificationStruct {
+                    email_notifications: false,
+                    push_notifications: false,
+                    claim_alerts: true,
+                    plan_updates: false,
+                    security_alerts: false,
+                    marketing_updates: false,
+                },
+                NotificationSettings::plan_updates => NotificationStruct {
+                    email_notifications: false,
+                    push_notifications: false,
+                    claim_alerts: false,
+                    plan_updates: true,
+                    security_alerts: false,
+                    marketing_updates: false,
+                },
+                NotificationSettings::security_alerts => NotificationStruct {
+                    email_notifications: false,
+                    push_notifications: false,
+                    claim_alerts: false,
+                    plan_updates: false,
+                    security_alerts: true,
+                    marketing_updates: false,
+                },
+                NotificationSettings::marketing_updates => NotificationStruct {
+                    email_notifications: false,
+                    push_notifications: false,
+                    claim_alerts: false,
+                    plan_updates: false,
+                    security_alerts: false,
+                    marketing_updates: true,
+                },
+            };
+
+            self.user_notifications.write(user, notification_struct);
+        }
+
+        // Helper function to record user activity
+        fn _record_activity(
+            ref self: ContractState,
+            user: ContractAddress,
+            activity_type: ActivityType,
+            details: felt252,
+        ) {
+            let current_pointer = self.user_activities_pointer.read(user);
+            let next_pointer = current_pointer + 1_u256;
+
+            let activity = ActivityRecord {
+                timestamp: get_block_timestamp(),
+                activity_type: activity_type,
+                details: details,
+                ip_address: 0, // We can't get IP in Cairo, so using 0
+                device_info: 0 // We can't get device info in Cairo, so using 0
+            };
+
+            // Fix: Use entry() pattern for nested maps
+            self.user_activities.entry(user).entry(current_pointer).write(activity);
+            self.user_activities_pointer.write(user, next_pointer);
+        }
+
+
+        fn get_user_profile(self: @ContractState, user: ContractAddress) -> UserProfile {
+            self.user_profiles.read(user)
+        }
+        fn update_security_settings(
+            ref self: ContractState, new_settings: SecuritySettings,
+        ) -> bool {
+            let caller = get_caller_address();
+            let mut profile = self.user_profiles.read(caller);
+            assert(profile.address == caller, 'Profile does not exist');
+            profile.security_settings = new_settings;
+
+            self.user_profiles.write(caller, profile);
+
+            true
+        }
+
+        // Wallet Management Functions
+        fn add_wallet(
+            ref self: ContractState, wallet: ContractAddress, wallet_type: felt252,
+        ) -> bool {
+            assert!(wallet != starknet::contract_address_const::<0>(), "Invalid wallet address");
+            let user = get_caller_address();
+            let length = self.user_wallets_length.read(user);
+
+            //
+            let mut wallet_exists = false;
+            let mut i = 0;
+            while i < length {
+                let w = self.user_wallets.read((user, i));
+                if w.address == wallet {
+                    wallet_exists = true;
+                    break;
+                }
+                i += 1;
+            }
+            assert!(!wallet_exists, "Wallet already exists");
+
+            let new_wallet = Wallet {
+                address: wallet,
+                is_primary: length == 0,
+                wallet_type,
+                added_at: get_block_timestamp(),
+            };
+            self.user_wallets.write((user, length), new_wallet);
+            self.user_wallets_length.write(user, length + 1);
+
+            if length == 0 {
+                self.user_primary_wallet.write(user, wallet);
+            }
+
+            let total_wallets = self.total_user_wallets.read(user);
+            self.total_user_wallets.write(user, total_wallets + 1);
+
+            true
+        }
+
+        fn set_primary_wallet(ref self: ContractState, wallet: ContractAddress) -> bool {
+            let user = get_caller_address();
+            let length = self.user_wallets_length.read(user);
+
+            let mut wallet_found = false;
+            let mut wallet_index = 0;
+            let mut i = 0;
+            while i < length {
+                let w = self.user_wallets.read((user, i));
+                if w.address == wallet {
+                    wallet_found = true;
+                    wallet_index = i;
+                    break;
+                }
+                i += 1;
+            }
+            assert!(wallet_found, "Wallet not found");
+
+            i = 0;
+            while i < length {
+                let mut w = self.user_wallets.read((user, i));
+                w.is_primary = (i == wallet_index);
+                self.user_wallets.write((user, i), w);
+                i += 1;
+            }
+
+            self.user_primary_wallet.write(user, wallet);
+
+            true
+        }
+
+        fn get_primary_wallet(self: @ContractState, user: ContractAddress) -> ContractAddress {
+            self.user_primary_wallet.read(user)
+        }
+
+        fn get_user_wallets(self: @ContractState, user: ContractAddress) -> Array<Wallet> {
+            let length = self.user_wallets_length.read(user);
+            let mut wallets = ArrayTrait::new();
+            let mut i = 0;
+            while i < length {
+                let wallet = self.user_wallets.read((user, i));
+                core::array::ArrayTrait::append(ref wallets, wallet);
+                i += 1;
+            }
+            wallets
+ main
         }
 
         fn is_plan_valid(self: @ContractState, plan_id: u256) -> bool {
@@ -594,3 +1074,4 @@ pub mod InheritX {
         }
     }
 }
+
