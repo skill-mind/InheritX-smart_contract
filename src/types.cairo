@@ -208,6 +208,8 @@ pub enum UserRole {
 pub enum ActivityType {
     #[default]
     Void,
+    RecoveryInitiated,
+    RecoveryVerified,
     Login: (),
     ProfileUpdate: (),
     WalletConnection: (),
