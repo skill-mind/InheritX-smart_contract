@@ -75,4 +75,117 @@ cd InheritX-smart_contract
 - Ensure all changes are tested before submission.
 - Document new features and updates thoroughly.
 
+# Upgradeable Contract System Deployment Guide
+
+This document provides instructions for deploying and upgrading the counter contract system using Starknet.
+
+## Prerequisites
+
+- Starknet CLI installed
+- Cairo compiler installed
+- Account configured with Starknet
+
+## Deployment Steps
+
+### 1. Compile the Contracts
+
+First, compile all the contracts:
+
+```bash
+scarb build
+```
+
+### 2. Declare Logic Contract (V1)
+
+```bash
+starknet declare --contract target/release/CounterLogic.json
+```
+
+Make note of the returned class hash: `0x<LOGIC_CLASS_HASH>`
+
+### 3. Deploy Logic Contract (V1)
+
+```bash
+starknet deploy --class_hash 0x<LOGIC_CLASS_HASH> --inputs <OWNER_ADDRESS>
+```
+
+### 4. Declare Proxy Contract
+
+```bash
+starknet declare --contract target/release/CounterProxy.json
+```
+
+Make note of the returned class hash: `0x<PROXY_CLASS_HASH>`
+
+### 5. Deploy Proxy Contract
+
+```bash
+starknet deploy --class_hash 0x<PROXY_CLASS_HASH> --inputs <OWNER_ADDRESS> <LOGIC_CLASS_HASH>
+```
+
+Your proxy contract is now deployed with the class hash of the logic contract. The proxy contract will be the one users interact with.
+
+## Upgrading the Contract
+
+When you want to upgrade to a new version of the logic contract, follow these steps:
+
+### 1. Declare New Logic Contract (V2)
+
+```bash
+starknet declare --contract target/release/CounterLogicV2.json
+```
+
+Make note of the returned class hash: `0x<LOGIC_V2_CLASS_HASH>`
+
+### 2. Call the Upgrade Function on Proxy
+
+```bash
+starknet invoke \
+  --address <PROXY_CONTRACT_ADDRESS> \
+  --function upgrade \
+  --inputs <LOGIC_V2_CLASS_HASH> \
+  --account <YOUR_ACCOUNT>
+```
+
+### 3. Verify the Upgrade
+
+You can verify that the logic contract has been upgraded by calling the `get_version` function:
+
+```bash
+starknet call \
+  --address <PROXY_CONTRACT_ADDRESS> \
+  --function get_version
+```
+
+The response should be "v2.0", confirming that the upgrade was successful.
+
+## State Persistence
+
+The beauty of this upgrade pattern is that all state is stored in the proxy contract. When you upgrade the logic contract, the state remains intact in the proxy contract's storage. This means:
+
+1. Counter values will persist after an upgrade
+2. Ownership will remain the same
+3. Any other state variables will be preserved
+
+## Security Considerations
+
+1. Only the contract owner can perform an upgrade
+2. The proxy pattern ensures that state is preserved during upgrades
+3. New implementations can add functionality but shouldn't change the storage layout
+
+## Community Engagement
+
+Join our Telegram group to discuss this project and share your feedback:
+[TG Group Link] (replace with your actual TG group link)
+
+When you join, please drop your TG handle so we can welcome you properly!
+
+## Troubleshooting
+
+If you encounter any issues during deployment or upgrade, please:
+
+1. Verify that you're using the correct class hashes
+2. Make sure you're calling functions with the correct account (owner)
+3. Check transaction receipts for detailed error messages
+
 Thank you for contributing to InheritX and helping us build a secure, innovative platform for digital asset inheritance!
