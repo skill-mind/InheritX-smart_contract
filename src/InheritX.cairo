@@ -157,17 +157,6 @@ pub mod InheritX {
         salt: felt252,
     }
 
-    //     #[derive(Copy, Drop, Serde)]
-
-    //     #[derive(Copy, Drop, Serde)]ze
-
-    //  enum VerificationStatus {
-    //     Unverified,
-    //     PendingVerification,
-    //     Verified,
-    //     Rejected,
-    // }
-
     #[constructor]
     fn constructor(ref self: ContractState) {
         self.admin.write(get_caller_address());
