@@ -16,11 +16,11 @@ jobs:
       
       - uses: software-mansion/setup-scarb@v1
         with:
-          scarb-version: "2.11.3"  # Latest version
+          scarb-version: "2.11.4"  # Latest version
       
       - uses: foundry-rs/setup-snfoundry@v3
         with:
-          starknet-foundry-version: "0.39.0"  # Latest stable version
+          starknet-foundry-version: "0.41.0"  # Latest stable version
       
       - name: Check Versions
         run: |
