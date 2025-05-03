@@ -1,9 +1,30 @@
+use inheritx::interfaces::ICounterLogic::{ICounterLogicDispatcher, ICounterLogicDispatcherTrait};
+use inheritx::interfaces::ICounterLogicV2::{
+    ICounterLogicV2Dispatcher, ICounterLogicV2DispatcherTrait,
+};
+use inheritx::interfaces::IProxy::{IProxyDispatcher, IProxyDispatcherTrait};
+use snforge_std::{
+    CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_block_timestamp, declare,
+    get_class_hash, start_cheat_block_timestamp, start_cheat_caller_address,
+    stop_cheat_block_timestamp, stop_cheat_caller_address,
+};
+use starknet::syscalls::deploy_syscall;
+use starknet::{ClassHash, ContractAddress, SyscallResultTrait, contract_address_const};
+
 #[cfg(test)]
 mod tests {
+    use core::result::ResultTrait;
     use inheritx::InheritX::InheritX;
+    use inheritx::interfaces::ICounterLogic::{
+        ICounterLogicDispatcher, ICounterLogicDispatcherTrait,
+    };
+    use inheritx::interfaces::ICounterLogicV2::{
+        ICounterLogicV2Dispatcher, ICounterLogicV2DispatcherTrait,
+    };
     use inheritx::interfaces::IInheritX::{
         AssetAllocation, IInheritX, IInheritXDispatcher, IInheritXDispatcherTrait,
     };
+    use inheritx::interfaces::IProxy::{IProxyDispatcher, IProxyDispatcherTrait};
     use inheritx::types::{
         ActivityType, MediaMessage, NotificationSettings, NotificationStruct, PlanConditions,
         PlanOverview, PlanSection, PlanStatus, SecuritySettings, SimpleBeneficiary, TokenInfo,
@@ -11,12 +32,13 @@ mod tests {
     };
     use snforge_std::{
         CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_block_timestamp,
-        cheat_caller_address, declare, start_cheat_block_timestamp, start_cheat_caller_address,
-        stop_cheat_caller_address,
+        cheat_caller_address, declare, get_class_hash, start_cheat_block_timestamp,
+        start_cheat_caller_address, stop_cheat_block_timestamp, stop_cheat_caller_address,
     };
     use starknet::class_hash::ClassHash;
+    use starknet::syscalls::deploy_syscall;
     use starknet::testing::{set_caller_address, set_contract_address};
-    use starknet::{ContractAddress, contract_address_const};
+    use starknet::{ContractAddress, SyscallResultTrait, contract_address_const};
     use super::*;
 
     // Sets up the environment for testing
@@ -150,7 +172,6 @@ mod tests {
         dispatcher.get_activity_history(user, 0, 0);
     }
 
-
     #[test]
     fn test_initial_data() {
         let (dispatcher, contract_address) = setup();
@@ -174,14 +195,10 @@ mod tests {
         let plan_name: felt252 = 'plan1';
         let description: felt252 = 'plan_desc';
 
-        // Ensure the caller is the admin
-        // cheat_caller_address(contract_address, benefactor, CheatSpan::Indefinite);
-
         // Call create_inheritance_plan
         let plan_id = dispatcher
             .create_inheritance_plan(plan_name, assets, description, pick_beneficiaries);
 
-        // assert(plan_id == 1, 'create_inheritance_plan failed');
         let plan = dispatcher.get_inheritance_plan(plan_id);
         assert(plan.is_active, 'is_active mismatch');
         assert(!plan.is_claimed, 'is_claimed mismatch');
@@ -197,9 +214,6 @@ mod tests {
         let plan_name: felt252 = 'plan1';
         let description: felt252 = 'plan_desc';
 
-        // Ensure the caller is the admin
-        // cheat_caller_address(contract_address, benefactor, CheatSpan::Indefinite);
-
         // Test with no assets
         let assets: Array<AssetAllocation> = array![];
         dispatcher.create_inheritance_plan(plan_name, assets, description, pick_beneficiaries);
@@ -214,9 +228,6 @@ mod tests {
         let pick_beneficiaries: Array<ContractAddress> = array![];
         let plan_name: felt252 = 'plan1';
         let description: felt252 = 'plan_desc';
-
-        // Ensure the caller is the admin
-        // cheat_caller_address(contract_address, benefactor, CheatSpan::Indefinite);
 
         let assets: Array<AssetAllocation> = array![
             AssetAllocation { token: benefactor, amount: 1000, percentage: 50 },
@@ -310,6 +321,7 @@ mod tests {
 
         stop_cheat_caller_address(contract_address);
     }
+
     // Helper function to setup contract with a test plan
     fn setup_with_plan() -> (IInheritXDispatcher, u256, ContractAddress) {
         let (IInheritXDispatcher, contract_address) = setup();
@@ -330,11 +342,6 @@ mod tests {
                 array![beneficiary1, beneficiary2],
             );
 
-        // To test media messages, we would need to add a function to the contract interface
-        // that allows adding media messages with recipients. Since that doesn't exist in your
-        // current interface, we'll focus on testing the beneficiaries section which we can
-        // properly set up through create_inheritance_plan
-
         (dispatcher, plan_id, contract_address)
     }
 
@@ -342,26 +349,6 @@ mod tests {
     #[should_panic(expected: 'Plan does not exist')]
     fn test_get_basic_information_section() {
         let (inheritx, plan_id, _) = setup_with_plan();
-        // storage_write(contract_address, "InheritX::Storage::plans_tokens_count", array[plan_id]!,
-        // 2);
-
-        // let token_info: TokenInfo = array![
-        // token_address: ContractAddress,
-        // symbol,
-        // chain,
-        // 450_u256,
-        // 1000_u256,
-        // ];
-
-        // let map_var_name = "InheritxPlan::Storage::plan_tokens";
-
-        // Write to storage for specific plan_id and token_index
-        // storage_write(
-        //     inheritx_address,
-        //     map_var_name,
-        //     array![plan_id.low, plan_id.high, token_index.into()], // Key parts
-        //     token_info
-        // );
 
         let result: PlanOverview = inheritx
             .get_plan_section(plan_id, PlanSection::BasicInformation);
@@ -369,9 +356,6 @@ mod tests {
         // Verify basic fields
         assert(result.name == 'Test Plan', 'Incorrect plan name');
         assert(result.description == 'Test Description', 'Incorrect description');
-
-        // Verify tokens were loaded
-        // assert(result.tokens_transferred.len() == 2, 'Should have 2 tokens');
 
         // Verify other sections empty
         assert(result.beneficiaries.len() == 0, 'Beneficiaries should be empty');
@@ -413,8 +397,6 @@ mod tests {
         // Test all sections
         let basic = inheritx.get_plan_section(plan_id, PlanSection::BasicInformation);
         assert(basic.tokens_transferred.len() == 0, 'Should not have tokens');
-        // let beneficiaries = inheritx.get_plan_section(plan_id, PlanSection::Beneficiaries);
-    // assert!(beneficiaries.beneficiaries.len() == 1, "Should have only 1 beneficiary");
     }
 
     #[test]
@@ -548,6 +530,7 @@ mod tests {
 
         IInheritXDispatcher.update_security_settings(SecuritySettings::Two_factor_disabled);
     }
+
     #[test]
     fn test_create_plan_without_profile() {
         let (IInheritXDispatcher, contract_address) = setup();
@@ -574,9 +557,8 @@ mod tests {
         assert(plan.total_value == 1000, 'Total value mismatch');
     }
 
-
     #[test]
-    #[should_panic(expected: ('Not your claim',))]
+    #[should_panic(expected: 'Not your claim')]
     fn test_claim_without_profile() {
         let (IInheritXDispatcher, contract_address) = setup();
         let user = 'user'.try_into().unwrap();
@@ -722,7 +704,6 @@ mod tests {
         assert(*wallets.at(1).wallet_type == type_inheritance, 'type2 mismatch');
     }
 
-
     #[test]
     fn test_plan_validation() {
         let (dispatcher, contract_address) = setup();
@@ -751,13 +732,13 @@ mod tests {
         let beneficiary_plan = dispatcher.check_beneficiary_plan(1);
         assert(beneficiary_plan, 'invalid tokens');
 
-        // // Simulate claiming the plan
+        // Simulate claiming the plan
         let mut plan = dispatcher.get_inheritance_plan(plan_id);
         assert(plan.is_claimed == false, 'plan should be claimed');
         plan.is_claimed = true;
 
         assert(!dispatcher.is_plan_valid(plan_id), 'be invalid after claiming');
-        // // Reset and test other modifications
+        // Reset and test other modifications
         plan.is_claimed = false;
     }
 
@@ -814,7 +795,7 @@ mod tests {
                 array![user, user1, user2, users],
             );
 
-        // // Remove all assets
+        // Remove all assets
         dispatcher.write_to_asset_count(plan_id, 0);
         assert(!dispatcher.is_plan_valid(plan_id), 'Plan should be invalid');
     }
@@ -849,4 +830,659 @@ mod tests {
         dispatcher.write_to_beneficiary_count(plan_id, 0);
         assert(!dispatcher.is_plan_valid(plan_id), 'Plan should be invalid');
     }
+
+    #[test]
+    fn test_create_claim() {
+        let (dispatcher, contract_address) = setup();
+        let benefactor: ContractAddress = contract_address_const::<'benefactor'>();
+        let beneficiary: ContractAddress = contract_address_const::<'beneficiary'>();
+
+        // Test input values
+        let name: felt252 = 'John';
+        let email: felt252 = 'John@yahoo.com';
+        let personal_message = 'i love you my son';
+        let claim_code = 2563;
+
+        // Ensure the caller is the admin
+        cheat_caller_address(contract_address, benefactor, CheatSpan::Indefinite);
+
+        // Call create_claim
+        let claim_id = dispatcher
+            .create_claim(name, email, beneficiary, personal_message, 1000, claim_code);
+
+        // Validate that the claim ID is correctly incremented
+        assert(claim_id == 0, 'claim ID should start from 0');
+
+        // Retrieve the claim to verify it was stored correctly
+        let claim = dispatcher.retrieve_claim(claim_id);
+        assert(claim.id == claim_id, 'claim ID mismatch');
+        assert(claim.name == name, 'claim title mismatch');
+        assert(claim.personal_message == personal_message, 'claim description mismatch');
+        assert(claim.code == claim_code, 'claim price mismatch');
+        assert(claim.wallet_address == beneficiary, 'cbenificiary address mismatch');
+        assert(claim.email == email, 'claim email mismatch');
+        assert(claim.benefactor == benefactor, 'benefactor address mismatch');
+    }
+
+    #[test]
+    fn test_collect_claim() {
+        let (dispatcher, contract_address) = setup();
+        let benefactor: ContractAddress = contract_address_const::<'benefactor'>();
+        let beneficiary: ContractAddress = contract_address_const::<'beneficiary'>();
+
+        // Test input values
+        let name: felt252 = 'John';
+        let email: felt252 = 'John@yahoo.com';
+        let personal_message = 'i love you my son';
+        let claim_code = 2563;
+
+        // Ensure the caller is the admin
+        cheat_caller_address(contract_address, benefactor, CheatSpan::Indefinite);
+
+        // Call create_claim
+        let claim_id = dispatcher
+            .create_claim(name, email, beneficiary, personal_message, 1000, claim_code);
+
+        // Validate that the claim ID is correctly incremented
+        assert(claim_id == 0, 'claim ID should start from 0');
+        cheat_caller_address(contract_address, beneficiary, CheatSpan::Indefinite);
+
+        let success = dispatcher.collect_claim(0, beneficiary, 2563);
+
+        assert(success, 'Claim unsuccessful');
+    }
+
+    #[test]
+    #[should_panic(expected: 'Not your claim')]
+    fn test_collect_claim_with_wrong_address() {
+        let (dispatcher, contract_address) = setup();
+        let benefactor: ContractAddress = contract_address_const::<'benefactor'>();
+        let beneficiary: ContractAddress = contract_address_const::<'beneficiary'>();
+        let malicious: ContractAddress = contract_address_const::<'malicious'>();
+
+        // Test input values
+        let name: felt252 = 'John';
+        let email: felt252 = 'John@yahoo.com';
+        let personal_message = 'i love you my son';
+        let claim_code = 2563;
+
+        // Ensure the caller is the admin
+        cheat_caller_address(contract_address, benefactor, CheatSpan::Indefinite);
+
+        // Call create_claim
+        let claim_id = dispatcher
+            .create_claim(name, email, beneficiary, personal_message, 1000, claim_code);
+
+        // Validate that the claim ID is correctly incremented
+        assert(claim_id == 0, 'claim ID should start from 0');
+        cheat_caller_address(contract_address, beneficiary, CheatSpan::Indefinite);
+
+        let success = dispatcher.collect_claim(0, malicious, 2563);
+
+        assert(success, 'Claim unsuccessful');
+    }
+
+    #[test]
+    #[should_panic(expected: 'Invalid claim code')]
+    fn test_collect_claim_with_wrong_code() {
+        let (dispatcher, contract_address) = setup();
+        let benefactor: ContractAddress = contract_address_const::<'benefactor'>();
+        let beneficiary: ContractAddress = contract_address_const::<'beneficiary'>();
+        let malicious: ContractAddress = contract_address_const::<'malicious'>();
+
+        // Test input values
+        let name: felt252 = 'John';
+        let email: felt252 = 'John@yahoo.com';
+        let personal_message = 'i love you my son';
+        let claim_code = 2563;
+
+        // Ensure the caller is the admin
+        cheat_caller_address(contract_address, benefactor, CheatSpan::Indefinite);
+
+        // Call create_claim
+        let claim_id = dispatcher
+            .create_claim(name, email, beneficiary, personal_message, 1000, claim_code);
+
+        // Validate that the claim ID is correctly incremented
+        assert(claim_id == 0, 'claim ID should start from 0');
+        cheat_caller_address(contract_address, beneficiary, CheatSpan::Indefinite);
+
+        let success = dispatcher.collect_claim(0, beneficiary, 63);
+
+        assert(success, 'Claim unsuccessful');
+    }
+
+    #[test]
+    #[should_panic(expected: 'You have already made a claim')]
+    fn test_collect_claim_twice() {
+        let (dispatcher, contract_address) = setup();
+        let benefactor: ContractAddress = contract_address_const::<'benefactor'>();
+        let beneficiary: ContractAddress = contract_address_const::<'beneficiary'>();
+        let malicious: ContractAddress = contract_address_const::<'malicious'>();
+
+        // Test input values
+        let name: felt252 = 'John';
+        let email: felt252 = 'John@yahoo.com';
+        let personal_message = 'i love you my son';
+        let claim_code = 2563;
+
+        // Ensure the caller is the admin
+        cheat_caller_address(contract_address, benefactor, CheatSpan::Indefinite);
+
+        // Call create_claim
+        let claim_id = dispatcher
+            .create_claim(name, email, beneficiary, personal_message, 1000, claim_code);
+
+        // Validate that the claim ID is correctly incremented
+        assert(claim_id == 0, 'claim ID should start from 0');
+        cheat_caller_address(contract_address, beneficiary, CheatSpan::Indefinite);
+
+        let success = dispatcher.collect_claim(0, beneficiary, 2563);
+
+        assert(success, 'Claim unsuccessful');
+
+        let success2 = dispatcher.collect_claim(0, beneficiary, 2563);
+    }
+
+    #[test]
+    fn test_collect_create_profile() {
+        let (dispatcher, contract_address) = setup();
+        let caller: ContractAddress = contract_address_const::<'benefactor'>();
+
+        // Test input values
+        let username: felt252 = 'John1234';
+        let email: felt252 = 'John@yahoo.com';
+        let fullname = 'John Doe';
+        let image = 'image';
+
+        // Ensure the caller is the admin
+        cheat_caller_address(contract_address, caller, CheatSpan::Indefinite);
+
+        // Call create_claim
+        let claim_id = dispatcher.create_profile(username, email, fullname, image);
+
+        // Validate that the claim ID is correctly incremented
+
+        cheat_caller_address(contract_address, caller, CheatSpan::Indefinite);
+
+        let new_profile = dispatcher.get_profile(caller);
+
+        assert(new_profile.username == username, 'Wrong Username');
+        assert(new_profile.email == email, ' Wrong email');
+        assert(new_profile.full_name == fullname, ' Wrong fullname');
+        assert(new_profile.profile_image == image, ' Wrong image');
+        assert(new_profile.address == caller, ' Wrong Owner');
+    }
+
+    #[test]
+    fn test_delete_profile() {
+        let (dispatcher, contract_address) = setup();
+        let caller: ContractAddress = contract_address_const::<'benefactor'>();
+
+        // Test input values
+        let username: felt252 = 'John1234';
+        let email: felt252 = 'John@yahoo.com';
+        let fullname = 'John Doe';
+        let image = 'image';
+
+        // Ensure the caller is the admin
+        cheat_caller_address(contract_address, caller, CheatSpan::Indefinite);
+
+        // Call create_claim
+        let claim_id = dispatcher.create_profile(username, email, fullname, image);
+
+        // Validate that the claim ID is correctly incremented
+
+        cheat_caller_address(contract_address, caller, CheatSpan::Indefinite);
+        let success = dispatcher.delete_user_profile(caller);
+        assert(success, 'Deletion Failed');
+        let new_profile = dispatcher.get_profile(caller);
+
+        assert(new_profile.username == ' ', 'Wrong Username');
+        assert(new_profile.email == ' ', ' Wrong email');
+        assert(new_profile.full_name == ' ', ' Wrong fullname');
+        assert(new_profile.profile_image == ' ', ' Wrong image');
+    }
+
+    #[test]
+    #[should_panic(expected: 'No right to delete')]
+    fn test_non_authorized_delete_profile() {
+        let (dispatcher, contract_address) = setup();
+        let caller: ContractAddress = contract_address_const::<'benefactor'>();
+        let malicious: ContractAddress = contract_address_const::<'malicious'>();
+
+        // Test input values
+        let username: felt252 = 'John1234';
+        let email: felt252 = 'John@yahoo.com';
+        let fullname = 'John Doe';
+        let image = 'image';
+
+        // Ensure the caller is the admin
+        cheat_caller_address(contract_address, caller, CheatSpan::Indefinite);
+
+        // Call create_claim
+        let claim_id = dispatcher.create_profile(username, email, fullname, image);
+
+        // Validate that the claim ID is correctly incremented
+
+        cheat_caller_address(contract_address, malicious, CheatSpan::Indefinite);
+        let success = dispatcher.delete_user_profile(caller);
+        assert(success, 'Deletion Failed');
+        let new_profile = dispatcher.get_profile(caller);
+
+        assert(new_profile.username == ' ', 'Wrong Username');
+        assert(new_profile.email == ' ', ' Wrong email');
+        assert(new_profile.full_name == ' ', ' Wrong fullname');
+        assert(new_profile.profile_image == ' ', ' Wrong image');
+    }
+
+    #[test]
+    fn test_record_user_activity() {
+        let (dispatcher, contract_address) = setup();
+        // setup test data
+        let user = contract_address_const::<'caller'>();
+        let activity_type = ActivityType::Login;
+        let details: felt252 = 'login by user';
+        let ip_address: felt252 = '0.0.0.0';
+        let device_info: felt252 = 'tester_device';
+
+        // call record activity
+        let activity_id: u256 = dispatcher
+            .record_user_activity(user, activity_type, details, ip_address, device_info);
+
+        // assertion calls
+        let activity = dispatcher.get_user_activity(user, activity_id);
+        assert(activity.device_info == device_info, 'invalid device info');
+        assert(activity.ip_address == ip_address, 'invalid ip address');
+        assert(activity.details == details, 'invalid details');
+    }
+
+    // Recovery Tests
+    #[test]
+    fn test_generate_recovery_code() {
+        // Setup
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user1'>();
+
+        // Set specific block timestamp for deterministic testing
+        let test_timestamp = 1648000000_u64;
+        start_cheat_block_timestamp(contract_address, test_timestamp);
+
+        // Call function
+        let recovery_code = dispatcher.generate_recovery_code(user);
+
+        // Since the function uses block timestamp and number which can vary,
+        // we can verify that the code is not zero, which would indicate failure
+        assert(recovery_code != 0, 'Recovery code can not be zero');
+
+        // Generate code again and ensure it's different (timestamp should change)
+        start_cheat_block_timestamp(contract_address, test_timestamp + 100);
+        let new_recovery_code = dispatcher.generate_recovery_code(user);
+        assert(recovery_code != new_recovery_code, 'Codes should be different');
+
+        stop_cheat_block_timestamp(contract_address);
+    }
+
+    #[test]
+    fn test_initiate_recovery() {
+        // Setup
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user1'>();
+
+        // Create user profile
+        start_cheat_caller_address(contract_address, user);
+        dispatcher.create_profile('username', 'email@example.com', 'Full Name', 'image_url');
+
+        // Set block timestamp
+        let test_timestamp = 1648000000_u64;
+        start_cheat_block_timestamp(contract_address, test_timestamp);
+
+        // Call initiate_recovery
+        let recovery_code = dispatcher.initiate_recovery(user, 'email');
+
+        // Verify code is not zero
+        assert(recovery_code != 0, 'Recovery code can not be zero');
+
+        // Verify code is valid
+        let is_valid = dispatcher.verify_recovery_code(user, recovery_code);
+        assert(is_valid, 'Code should be valid');
+
+        stop_cheat_block_timestamp(contract_address);
+    }
+
+    #[test]
+    #[should_panic(expected: ('User profile does not exist',))]
+    fn test_initiate_recovery_nonexistent_user() {
+        let (dispatcher, contract_address) = setup();
+        let nonexistent_user = contract_address_const::<'nonexistent'>();
+
+        // This should fail with "User profile does not exist"
+        dispatcher.initiate_recovery(nonexistent_user, 'email');
+    }
+
+    #[test]
+    fn test_verify_recovery_code() {
+        // Setup
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user1'>();
+
+        // Create user profile
+        start_cheat_caller_address(contract_address, user);
+        dispatcher.create_profile('username', 'email@example.com', 'Full Name', 'image_url');
+
+        // Set block timestamp
+        let test_timestamp = 1648000000_u64;
+        start_cheat_block_timestamp(contract_address, test_timestamp);
+
+        // Initiate recovery
+        let recovery_code = dispatcher.initiate_recovery(user, 'email');
+
+        // Verify valid code
+        let is_valid = dispatcher.verify_recovery_code(user, recovery_code);
+        assert(is_valid, 'Code should be valid');
+
+        // Test invalid code
+        let invalid_code = recovery_code + 1;
+        let is_invalid = dispatcher.verify_recovery_code(user, invalid_code);
+        assert(!is_invalid, 'Invalid code should not verify');
+
+        stop_cheat_block_timestamp(contract_address);
+    }
+
+    #[test]
+    fn test_verify_recovery_code_expired() {
+        // Setup
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user1'>();
+
+        // Create user profile
+        start_cheat_caller_address(contract_address, user);
+        dispatcher.create_profile('username', 'email@example.com', 'Full Name', 'image_url');
+
+        // Set block timestamp
+        let test_timestamp = 1648000000_u64;
+        start_cheat_block_timestamp(contract_address, test_timestamp);
+
+        // Initiate recovery
+        let recovery_code = dispatcher.initiate_recovery(user, 'email');
+
+        // Set timestamp after expiry (3600 seconds + 1)
+        start_cheat_block_timestamp(contract_address, test_timestamp + 3601);
+
+        // Verify expired code
+        let is_valid = dispatcher.verify_recovery_code(user, recovery_code);
+        assert(!is_valid, 'Expired code can not be valid');
+
+        stop_cheat_block_timestamp(contract_address);
+    }
+
+    #[test]
+    fn test_verify_recovery_code_cleanup() {
+        // Setup
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user1'>();
+
+        // Create user profile
+        start_cheat_caller_address(contract_address, user);
+        dispatcher.create_profile('username', 'email@example.com', 'Full Name', 'image_url');
+
+        // Initiate recovery
+        let test_timestamp = 1648000000_u64;
+        start_cheat_block_timestamp(contract_address, test_timestamp);
+        let recovery_code = dispatcher.initiate_recovery(user, 'email');
+
+        // Verify code (this should clear the code and expiry)
+        let is_valid = dispatcher.verify_recovery_code(user, recovery_code);
+        assert(is_valid, 'Code should be valid initially');
+
+        // Try to verify again - should fail because code was cleared
+        let is_still_valid = dispatcher.verify_recovery_code(user, recovery_code);
+        assert(!is_still_valid, 'Code expires after use');
+
+        stop_cheat_block_timestamp(contract_address);
+    }
+
+
+    #[test]
+    fn test_plan_modifications() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
+        let beneficiary1 = contract_address_const::<'beneficiary1'>();
+        let beneficiary2 = contract_address_const::<'beneficiary2'>();
+
+        start_cheat_caller_address(contract_address, user);
+        cheat_block_timestamp(contract_address, 1000, CheatSpan::Indefinite);
+
+        // Create initial plan
+        let plan_id = dispatcher
+            .create_inheritance_plan(
+                'Test Plan',
+                array![AssetAllocation { token: contract_address, amount: 1000, percentage: 100 }],
+                'Test Description',
+                array![beneficiary1],
+            );
+
+        // Add new beneficiary
+        dispatcher.add_beneficiary(plan_id, 'Beneficiary 2', 'ben2@example.com', beneficiary2);
+
+        // Verify beneficiaries
+        let beneficiary_count = dispatcher.get_plan_beneficiaries_count(plan_id);
+        assert(beneficiary_count == 2, 'Should have 2 beneficiaries');
+
+        // Verify beneficiary is added
+        assert(dispatcher.is_beneficiary(plan_id, beneficiary2), 'Beneficiary 2 should be added');
+    }
+
+
+    #[test]
+    fn test_plan_asset_distribution() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
+        let beneficiary1 = contract_address_const::<'beneficiary1'>();
+        let beneficiary2 = contract_address_const::<'beneficiary2'>();
+
+        start_cheat_caller_address(contract_address, user);
+        cheat_block_timestamp(contract_address, 1000, CheatSpan::Indefinite);
+
+        // Create plan with multiple assets
+        let plan_id = dispatcher
+            .create_inheritance_plan(
+                'Test Plan',
+                array![
+                    AssetAllocation { token: contract_address, amount: 1000, percentage: 60 },
+                    AssetAllocation { token: contract_address, amount: 1000, percentage: 40 },
+                ],
+                'Test Description',
+                array![beneficiary1, beneficiary2],
+            );
+
+        // Get plan overview
+        let plan = dispatcher.get_inheritance_plan(plan_id);
+        assert(plan.total_value == 2000, 'Total value should be 2000');
+    }
+
+    #[test]
+    fn test_plan_beneficiary_management() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user'>();
+        let beneficiary1 = contract_address_const::<'beneficiary1'>();
+        let beneficiary2 = contract_address_const::<'beneficiary2'>();
+
+        start_cheat_caller_address(contract_address, user);
+        cheat_block_timestamp(contract_address, 1000, CheatSpan::Indefinite);
+
+        // Create initial plan
+        let plan_id = dispatcher
+            .create_inheritance_plan(
+                'Test Plan',
+                array![AssetAllocation { token: contract_address, amount: 1000, percentage: 100 }],
+                'Test Description',
+                array![beneficiary1],
+            );
+
+        // Add second beneficiary
+        dispatcher.add_beneficiary(plan_id, 'Beneficiary 2', 'ben2@example.com', beneficiary2);
+
+        // Verify beneficiaries
+        let beneficiary_count = dispatcher.get_plan_beneficiaries_count(plan_id);
+        assert(beneficiary_count == 2, 'Should have 2 beneficiaries');
+
+        // Verify both beneficiaries are added
+        assert(dispatcher.is_beneficiary(plan_id, beneficiary1), 'Beneficiary 1 should exist');
+        assert(dispatcher.is_beneficiary(plan_id, beneficiary2), 'Beneficiary 2 should exist');
+    }
 }
+
+// Counter Logic and Proxy Test Helpers
+fn deploy_counter_logic_v1() -> ClassHash {
+    let owner = contract_address_const::<'owner'>();
+    // Declare the V1 contract
+    let declare_result = declare("CounterLogicV1").unwrap().contract_class();
+    let (address, _) = declare_result.deploy(@array![owner.into()]).unwrap();
+
+    get_class_hash(address)
+}
+
+fn deploy_counter_logic_v2() -> ClassHash {
+    let owner = contract_address_const::<'owner'>();
+    // Declare the V1 contract
+    let declare_result = declare("CounterLogicV2").unwrap().contract_class();
+    let (address, _) = declare_result.deploy(@array![owner.into()]).unwrap();
+
+    get_class_hash(address)
+}
+
+fn deploy_counter_instance(class_hash: ClassHash) -> (ContractAddress, ContractAddress) {
+    let owner = contract_address_const::<0x123>();
+
+    // Deploy logic with constructor args
+    let mut calldata = array![];
+    calldata.append(owner.into());
+
+    let (contract_address, _) = deploy_syscall(class_hash, 0, calldata.span(), false)
+        .unwrap_syscall();
+
+    (contract_address, owner)
+}
+
+fn deploy_proxy(implementation_hash: ClassHash) -> ContractAddress {
+    let owner = contract_address_const::<0x123>();
+
+    // Declare the proxy contract
+    let declare_result = declare("CounterProxy").unwrap().contract_class();
+
+    // Deploy with constructor args
+    let mut calldata = ArrayTrait::<felt252>::new();
+    calldata.append(owner.into());
+    calldata.append(implementation_hash.into());
+
+    let (proxy_address, _) = declare_result.deploy(@calldata).unwrap();
+
+    proxy_address
+}
+
+// Counter Logic and Proxy Tests
+#[test]
+fn test_implementation_upgrade() {
+    // Deploy initial logic contract (v1)
+    let logic_hash_v1 = deploy_counter_logic_v1();
+    let logic_address_v1 = deploy_counter_instance(logic_hash_v1);
+
+    // Deploy proxy with logic implementation
+    let proxy_address = deploy_proxy(logic_hash_v1);
+
+    // Set caller to owner
+    let owner = contract_address_const::<0x123>();
+    start_cheat_caller_address(proxy_address, owner);
+
+    // Check proxy implementation
+    let proxy_dispatcher = IProxyDispatcher { contract_address: proxy_address };
+    let initial_impl = proxy_dispatcher.get_implementation();
+    assert(initial_impl == logic_hash_v1, 'Initial impl should be v1');
+
+    // Deploy v2 implementation
+    let logic_hash_v2 = deploy_counter_logic_v2();
+    let logic_address_v2 = deploy_counter_instance(logic_hash_v2);
+
+    // Upgrade proxy to new logic
+    proxy_dispatcher.upgrade(logic_hash_v2);
+
+    // Check implementation was updated
+    let new_impl = proxy_dispatcher.get_implementation();
+    assert(new_impl == logic_hash_v2, 'Implementation not updated');
+}
+
+#[test]
+fn test_functionality() {
+    // Deploy v1 implementation
+    let logic_hash_v1 = deploy_counter_logic_v1();
+    let (logic_address_v1, owner) = deploy_counter_instance(logic_hash_v1);
+
+    start_cheat_caller_address(logic_address_v1, owner);
+    // Test v1 functionality
+    let v1_dispatcher = ICounterLogicDispatcher { contract_address: logic_address_v1 };
+
+    // Check initial version
+    let version = v1_dispatcher.get_version();
+    assert(version == 'v1.0', 'Wrong initial version');
+}
+
+#[test]
+fn test_increment_functionality() {
+    // Deploy v1 implementation
+    let logic_hash_v1 = deploy_counter_logic_v1();
+    let (logic_address_v1, owner) = deploy_counter_instance(logic_hash_v1);
+
+    start_cheat_caller_address(logic_address_v1, owner);
+    // Test v1 functionality
+    let v1_dispatcher = ICounterLogicDispatcher { contract_address: logic_address_v1 };
+
+    // Increment counter
+    v1_dispatcher.increment();
+    v1_dispatcher.increment();
+
+    // Check counter value
+    let counter = v1_dispatcher.get_counter();
+    assert(counter == 2, 'Counter should be 2');
+}
+
+#[test]
+fn test_deploy_v2_increment_by() {
+    // Deploy v2 implementation
+    let logic_hash_v2 = deploy_counter_logic_v2();
+    let (logic_address_v2, owner) = deploy_counter_instance(logic_hash_v2);
+
+    // Test v2 functionality
+    let v2_dispatcher = ICounterLogicV2Dispatcher { contract_address: logic_address_v2 };
+
+    // Check version
+    let v2_version = v2_dispatcher.get_version();
+    assert(v2_version == 'v2.0', 'Wrong v2 version');
+
+    start_cheat_caller_address(logic_address_v2, owner);
+    v2_dispatcher.increment_by(3);
+    stop_cheat_caller_address(logic_address_v2);
+    let counter_after = v2_dispatcher.get_counter();
+    assert(counter_after == 3, 'Counter should be 3');
+}
+
+#[test]
+fn test_deploy_v2_reset() {
+    // Deploy v2 implementation
+    let logic_hash_v2 = deploy_counter_logic_v2();
+    let (logic_address_v2, owner) = deploy_counter_instance(logic_hash_v2);
+
+    // Test v2 functionality
+    let v2_dispatcher = ICounterLogicV2Dispatcher { contract_address: logic_address_v2 };
+
+    // Check version
+    let v2_version = v2_dispatcher.get_version();
+    assert(v2_version == 'v2.0', 'Wrong v2 version');
+
+    start_cheat_caller_address(logic_address_v2, owner);
+    v2_dispatcher.reset();
+    stop_cheat_caller_address(logic_address_v2);
+    let counter_reset = v2_dispatcher.get_counter();
+    assert(counter_reset == 0, 'Counter should be reset to 0');
+}
+
