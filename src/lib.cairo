@@ -8,6 +8,7 @@ pub mod interfaces {
 }
 pub mod CounterLogic;
 pub mod CounterLogicV2;
+pub mod InheritXSwap;
 pub mod Proxy;
 
 

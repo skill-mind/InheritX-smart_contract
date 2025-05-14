@@ -1,14 +1,14 @@
 use starknet::ContractAddress;
 
 #[starknet::interface]
-trait IInheritXSwap<TContractState> {
+pub trait IInheritXSwap<TContractState> {
     // View functions
-    fn get_swap_rate(
-        self: @TContractState,
-        token_in: ContractAddress,
-        token_out: ContractAddress,
-        amount_in: u256,
-    ) -> u256;
+    // fn get_swap_rate(
+    //     self: @TContractState,
+    //     token_in: ContractAddress,
+    //     token_out: ContractAddress,
+    //     amount_in: u256,
+    // ) -> u256;
 
     fn get_supported_tokens(self: @TContractState) -> Array<ContractAddress>;
     fn get_liquidity(
@@ -16,23 +16,23 @@ trait IInheritXSwap<TContractState> {
     ) -> (u256, u256);
 
     // External functions
-    fn swap_exact_tokens_for_tokens(
-        ref self: TContractState,
-        amount_in: u256,
-        min_amount_out: u256,
-        path: Array<ContractAddress>,
-        recipient: ContractAddress,
-        deadline: u64,
-    ) -> u256;
+    // fn swap_exact_tokens_for_tokens(
+    //     ref self: TContractState,
+    //     amount_in: u256,
+    //     min_amount_out: u256,
+    //     path: Array<ContractAddress>,
+    //     recipient: ContractAddress,
+    //     deadline: u64,
+    // ) -> u256;
 
-    fn swap_tokens_for_exact_tokens(
-        ref self: TContractState,
-        amount_out: u256,
-        max_amount_in: u256,
-        path: Array<ContractAddress>,
-        recipient: ContractAddress,
-        deadline: u64,
-    ) -> u256;
+    // fn swap_tokens_for_exact_tokens(
+    //     ref self: TContractState,
+    //     amount_out: u256,
+    //     max_amount_in: u256,
+    //     path: Array<ContractAddress>,
+    //     recipient: ContractAddress,
+    //     deadline: u64,
+    // ) -> u256;
 
     fn add_liquidity(
         ref self: TContractState,
@@ -64,11 +64,11 @@ struct SwapRoute {
     amounts: Span<u256>,
 }
 
-#[derive(Copy, Drop, Serde, starknet::Store)]
-struct LiquidityPool {
-    token_a: ContractAddress,
-    token_b: ContractAddress,
-    reserve_a: u256,
-    reserve_b: u256,
-    total_supply: u256,
+#[derive(Copy, Drop, Serde, Hash, starknet::Store)]
+pub struct LiquidityPool {
+    pub token_a: ContractAddress,
+    pub token_b: ContractAddress,
+    pub reserve_a: u256,
+    pub reserve_b: u256,
+    pub total_supply: u256,
 }
