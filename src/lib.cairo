@@ -13,3 +13,7 @@ pub mod Proxy;
 
 
 pub mod types;
+
+pub mod mocks {
+    pub mod mock_erc20;
+}

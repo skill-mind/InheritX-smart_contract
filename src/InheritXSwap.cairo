@@ -41,10 +41,16 @@ pub mod InheritXSwap {
     // Storage
     #[storage]
     struct Storage {
+        // Mapping of token pairs to their liquidity pools
         pools: Map<PoolKey, LiquidityPool>,
+        // Mapping of user's liquidity positions
         shares: Map<(PoolKey, ContractAddress), u256>,
+        // Mapping of supported tokens to their status
+        // true if the token is supported, false otherwise
         supported_tokens: Map<ContractAddress, bool>,
+        // List of supported tokens
         token_list: Map<u32, ContractAddress>,
+        // Count of supported tokens
         token_count: u32,
         #[substorage(v0)]
         erc20: ERC20Component::Storage,
@@ -57,7 +63,7 @@ pub mod InheritXSwap {
     // Events
     #[event]
     #[derive(Drop, starknet::Event)]
-    enum Event {
+    pub enum Event {
         LiquidityAdded: LiquidityAdded,
         LiquidityRemoved: LiquidityRemoved,
         TokenAdded: TokenAdded,
@@ -70,23 +76,23 @@ pub mod InheritXSwap {
     }
 
     #[derive(Drop, starknet::Event)]
-    struct LiquidityAdded {
-        provider: ContractAddress,
-        token_a: ContractAddress,
-        token_b: ContractAddress,
-        amount_a: u256,
-        amount_b: u256,
-        shares: u256,
+    pub struct LiquidityAdded {
+        pub provider: ContractAddress,
+        pub token_a: ContractAddress,
+        pub token_b: ContractAddress,
+        pub amount_a: u256,
+        pub amount_b: u256,
+        pub liquidity: u256,
     }
 
     #[derive(Drop, starknet::Event)]
-    struct LiquidityRemoved {
-        provider: ContractAddress,
-        token_a: ContractAddress,
-        token_b: ContractAddress,
-        amount_a: u256,
-        amount_b: u256,
-        shares: u256,
+    pub struct LiquidityRemoved {
+        pub recipient: ContractAddress,
+        pub token_a: ContractAddress,
+        pub token_b: ContractAddress,
+        pub amount_a: u256,
+        pub amount_b: u256,
+        pub liquidity: u256,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -96,7 +102,10 @@ pub mod InheritXSwap {
 
     #[constructor]
     fn constructor(ref self: ContractState, owner: ContractAddress) {
-        self.erc20.initializer("InheritXSwap", "IXS");
+        let name: ByteArray = "InheritXSwap";
+        let symbol: ByteArray = "IXS";
+
+        self.erc20.initializer(name, symbol);
         self.ownable.initializer(owner);
     }
 
@@ -104,24 +113,30 @@ pub mod InheritXSwap {
     #[generate_trait]
     impl PrivateFunctions of PrivateFunctionsTrait {
         fn _mint(ref self: ContractState, pool_key: PoolKey, to: ContractAddress, amount: u256) {
+            // update LP shares/tokens balance per user
             let key = (pool_key, to);
             let current_shares = self.shares.entry(key).read();
             let new_shares = current_shares + amount; // Direct addition
             self.shares.entry(key).write(new_shares);
 
+            // update LP total supply
             let mut pool = self.pools.entry(pool_key).read();
             pool.total_supply = pool.total_supply + amount; // Direct addition
             self.pools.entry(pool_key).write(pool);
+            // // mints LP tokens (ERC20) to represent user's liquidity share
+        // self.erc20.mint(to, amount);
         }
 
 
         fn _burn(ref self: ContractState, pool_key: PoolKey, from: ContractAddress, amount: u256) {
+            // update LP shares/tokens balance per user
             let key = (pool_key, from);
             let current_shares = self.shares.entry(key).read();
-            assert(current_shares >= amount, 'INSUFFICIENT_SHARES');
+            assert(current_shares >= amount, 'INSUFFICIENT_LIQUIDITY');
             let new_shares = current_shares - amount; // Direct subtraction
             self.shares.entry(key).write(new_shares);
 
+            // update LP total supply
             let mut pool = self.pools.entry(pool_key).read();
             pool.total_supply = pool.total_supply - amount; // Direct subtraction
             self.pools.entry(pool_key).write(pool);
@@ -162,6 +177,7 @@ pub mod InheritXSwap {
 
     #[abi(embed_v0)]
     impl InheritXSwapImpl of IInheritXSwap<ContractState> {
+        // Get supported tokens
         fn get_supported_tokens(self: @ContractState) -> Array<ContractAddress> {
             let mut tokens = ArrayTrait::new();
             let count = self.token_count.read();
@@ -176,11 +192,11 @@ pub mod InheritXSwap {
             tokens
         }
 
+        // Get liquidity reserves for a token pair
         fn get_liquidity(
             self: @ContractState, token_a: ContractAddress, token_b: ContractAddress,
         ) -> (u256, u256) {
-            assert(token_a.is_non_zero() && token_b.is_non_zero(), 'INVALID_TOKENS');
-            let pool_key = PrivateFunctions::_get_ordered_pair(token_a, token_b);
+            let pool_key = self.get_ordered_token_pair(token_a, token_b);
             let pool = self.pools.entry(pool_key).read();
             if token_a == pool.token_a {
                 (pool.reserve_a, pool.reserve_b)
@@ -189,6 +205,22 @@ pub mod InheritXSwap {
             }
         }
 
+        // Get ordered token pair for a given token pair
+        fn get_ordered_token_pair(
+            self: @ContractState, token_a: ContractAddress, token_b: ContractAddress,
+        ) -> PoolKey {
+            assert(token_a.is_non_zero() && token_b.is_non_zero(), 'INVALID_TOKENS');
+            assert(token_a != token_b, 'IDENTICAL_TOKENS');
+            // Ensure both tokens are supported
+            assert(
+                self.supported_tokens.entry(token_a).read()
+                    && self.supported_tokens.entry(token_b).read(),
+                'TOKENS_NOT_SUPPORTED',
+            );
+            PrivateFunctions::_get_ordered_pair(token_a, token_b)
+        }
+
+        // Add liquidity to a pool
         fn add_liquidity(
             ref self: ContractState,
             token_a: ContractAddress,
@@ -202,7 +234,9 @@ pub mod InheritXSwap {
         ) -> (u256, u256) {
             self.reentrancy_guard.start();
 
+            // Validate inputs
             assert(token_a.is_non_zero() && token_b.is_non_zero(), 'INVALID_TOKENS');
+            assert(token_a != token_b, 'IDENTICAL_TOKENS');
             assert(recipient.is_non_zero(), 'INVALID_RECIPIENT');
             assert(amount_a_desired > 0 && amount_b_desired > 0, 'INVALID_AMOUNTS');
             assert(get_block_timestamp() <= deadline, 'DEADLINE_EXPIRED');
@@ -226,8 +260,9 @@ pub mod InheritXSwap {
                 IERC20Dispatcher { contract_address: pool_key.token_a },
                 IERC20Dispatcher { contract_address: pool_key.token_b },
             );
+            let (caller, contract) = (get_caller_address(), get_contract_address());
 
-            let mut pool = self.pools.entry(pool_key).read();
+            let pool = self.pools.entry(pool_key).read();
             let total_supply = pool.total_supply;
 
             // Calculate liquidity shares to mint per pool/user
@@ -258,7 +293,7 @@ pub mod InheritXSwap {
                     self.token_list.entry(count).write(pool_key.token_b);
                     self.token_count.write(count + 1);
                 }
-                // Shares = sqrt(amount_a * amount_b)
+                // LP Shares = sqrt(amount_a * amount_b)
                 (amount_a * amount_b).sqrt().into()
             } else {
                 PrivateFunctions::_check_ratio(pool.reserve_a, pool.reserve_b, amount_a, amount_b);
@@ -267,12 +302,19 @@ pub mod InheritXSwap {
                 PrivateFunctions::_min(shares_a, shares_b)
             };
 
-            assert(shares > 0, 'INSUFFICIENT_SHARES_MINTED');
-            assert(amount_a >= min_a && amount_b >= min_b, 'INSUFFICIENT_AMOUNT');
+            // Verify minimum amounts
+            assert(shares > 0, 'INSUFFICIENT_LIQUIDITY_MINTED');
+            assert(amount_a >= min_a && amount_b >= min_b, 'INSUFFICIENT_AMOUNT_TO_MINIMUM');
 
-            // Transfer tokens
-            token0.transfer_from(get_caller_address(), get_contract_address(), amount_a);
-            token1.transfer_from(get_caller_address(), get_contract_address(), amount_b);
+            // Check balances
+            assert(
+                token0.balance_of(caller) >= amount_a && token1.balance_of(caller) >= amount_b,
+                'INSUFFICIENT_CALLER_BALANCE',
+            );
+
+            // Transfer tokens to contract
+            token0.transfer_from(caller, contract, amount_a);
+            token1.transfer_from(caller, contract, amount_b);
 
             // Update reserves
             let new_reserve_a = pool.reserve_a + amount_a; // Direct addition
@@ -284,17 +326,18 @@ pub mod InheritXSwap {
             self
                 .emit(
                     LiquidityAdded {
-                        provider: get_caller_address(),
+                        provider: caller,
                         token_a: pool_key.token_a,
                         token_b: pool_key.token_b,
                         amount_a,
                         amount_b,
-                        shares,
+                        liquidity: shares,
                     },
                 );
 
             self.reentrancy_guard.end();
 
+            // Return amounts of liquidity added, in the order of the pool key
             if is_ordered {
                 (amount_a, amount_b)
             } else {
@@ -302,6 +345,7 @@ pub mod InheritXSwap {
             }
         }
 
+        // Remove liquidity from a pool
         fn remove_liquidity(
             ref self: ContractState,
             token_a: ContractAddress,
@@ -316,8 +360,9 @@ pub mod InheritXSwap {
 
             // Validate inputs
             assert(token_a.is_non_zero() && token_b.is_non_zero(), 'INVALID_TOKENS');
+            assert(token_a != token_b, 'IDENTICAL_TOKENS');
             assert(recipient.is_non_zero(), 'INVALID_RECIPIENT');
-            assert(liquidity > 0, 'INVALID_LIQUIDITY');
+            assert(liquidity > 0, 'INVALID_LIQUIDITY_ENTRY');
             assert(get_block_timestamp() <= deadline, 'DEADLINE_EXPIRED');
 
             let pool_key = PrivateFunctions::_get_ordered_pair(token_a, token_b);
@@ -333,59 +378,105 @@ pub mod InheritXSwap {
                 IERC20Dispatcher { contract_address: pool_key.token_a },
                 IERC20Dispatcher { contract_address: pool_key.token_b },
             );
+            // Get caller and contract addresses
+            let (caller, contract) = (get_caller_address(), get_contract_address());
 
             let pool = self.pools.entry(pool_key).read();
+
+            // Conduct pool checks
             assert(pool.total_supply > 0, 'POOL_NOT_FOUND');
+            assert(pool.reserve_a > 0 && pool.reserve_b > 0, 'EMPTY_POOL');
 
-            let key = (pool_key, get_caller_address());
+            let key = (pool_key, recipient);
             let user_shares = self.shares.entry(key).read();
-            assert(user_shares >= liquidity, 'INSUFFICIENT_SHARES');
+            assert(user_shares >= liquidity, 'INSUFFICIENT_USER_LIQUIDITY');
 
-            // Calculate amounts to withdraw
-            let amount_a = liquidity * pool.reserve_a; // Direct multiplication
-            let amount_a_final = amount_a / pool.total_supply;
-            let amount_b = liquidity * pool.reserve_b; // Direct multiplication
-            let amount_b_final = amount_b / pool.total_supply;
+            // Calculate share of pool to withdraw
+            let amount_a = liquidity * pool.reserve_a / pool.total_supply; // Direct multiplication
+            let amount_b = liquidity * pool.reserve_b / pool.total_supply; // Direct multiplication
 
-            assert(amount_a_final >= min_a && amount_b_final >= min_b, 'INSUFFICIENT_AMOUNT');
-            assert(amount_a_final > 0 && amount_b_final > 0, 'INSUFFICIENT_LIQUIDITY_BURNED');
+            // Ensure amounts are sufficient
+            assert(amount_a >= min_a, 'INSUFFICIENT_AMOUNT_A');
+            assert(amount_b >= min_b, 'INSUFFICIENT_AMOUNT_B');
+            assert(amount_a > 0 && amount_b > 0, 'INSUFFICIENT_LIQUIDITY_BURN');
 
-            // Update pool state
-            let new_reserve_a = pool.reserve_a - amount_a_final; // Direct subtraction
-            let new_reserve_b = pool.reserve_b - amount_b_final; // Direct subtraction
+            // Update pool state before transfers
+            let new_reserve_a = pool.reserve_a - amount_a; // Direct subtraction
+            let new_reserve_b = pool.reserve_b - amount_b; // Direct subtraction
 
-            PrivateFunctions::_burn(ref self, pool_key, get_caller_address(), liquidity);
+            PrivateFunctions::_burn(ref self, pool_key, recipient, liquidity);
             PrivateFunctions::_update(ref self, pool_key, new_reserve_a, new_reserve_b);
 
+            // Check contract balances
+            assert(token0.balance_of(contract) >= amount_a, 'INSUFFICIENT_TOKEN0_BALANCE');
+            assert(token1.balance_of(contract) >= amount_b, 'INSUFFICIENT_TOKEN1_BALANCE');
+
             // Transfer tokens to recipient
-            token0.transfer(recipient, amount_a_final);
-            token1.transfer(recipient, amount_b_final);
+            token0.transfer(recipient, amount_a);
+            token1.transfer(recipient, amount_b);
 
             // Emit event
             self
                 .emit(
                     LiquidityRemoved {
-                        provider: get_caller_address(),
+                        recipient: recipient,
                         token_a: pool_key.token_a,
                         token_b: pool_key.token_b,
-                        amount_a: amount_a_final,
-                        amount_b: amount_b_final,
-                        shares: liquidity,
+                        amount_a,
+                        amount_b,
+                        liquidity,
                     },
                 );
 
             self.reentrancy_guard.end();
 
+            // Return amounts of liquidity removed, in the order of the pool key
             if is_ordered {
-                (amount_a_final, amount_b_final)
+                (amount_a, amount_b)
             } else {
-                (amount_b_final, amount_a_final)
+                (amount_b, amount_a)
             }
+        }
+
+        fn get_swap_rate(
+            self: @ContractState,
+            token_in: ContractAddress,
+            token_out: ContractAddress,
+            amount_in: u256,
+        ) -> u256 {
+            // Implementation will be added in a separate PR
+            0
+        }
+
+        fn swap_exact_tokens_for_tokens(
+            ref self: ContractState,
+            amount_in: u256,
+            min_amount_out: u256,
+            path: Array<ContractAddress>,
+            recipient: ContractAddress,
+            deadline: u64,
+        ) -> u256 {
+            // Implementation will be added in a separate PR
+            0
+        }
+
+        fn swap_tokens_for_exact_tokens(
+            ref self: ContractState,
+            amount_out: u256,
+            max_amount_in: u256,
+            path: Array<ContractAddress>,
+            recipient: ContractAddress,
+            deadline: u64,
+        ) -> u256 {
+            // Implementation will be added in a separate PR
+            0
         }
     }
 
     #[generate_trait]
-    impl InternalFunctions of InternalFunctionsTrait {
+    #[abi(per_item)]
+    impl ExternalImpl of ExternalTrait {
+        #[external(v0)]
         fn add_supported_token(ref self: ContractState, token: ContractAddress) {
             self.ownable.assert_only_owner();
             assert(token.is_non_zero(), 'INVALID_TOKEN');
@@ -395,6 +486,7 @@ pub mod InheritXSwap {
             self.token_list.entry(count).write(token);
             self.token_count.write(count + 1);
             self.supported_tokens.entry(token).write(true);
+
             self.emit(TokenAdded { token });
         }
     }
