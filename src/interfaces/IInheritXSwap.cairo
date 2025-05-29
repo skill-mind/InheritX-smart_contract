@@ -1,7 +1,8 @@
 use starknet::ContractAddress;
+use crate::InheritXSwap::InheritXSwap::PoolKey;
 
 #[starknet::interface]
-trait IInheritXSwap<TContractState> {
+pub trait IInheritXSwap<TContractState> {
     // View functions
     fn get_swap_rate(
         self: @TContractState,
@@ -14,6 +15,9 @@ trait IInheritXSwap<TContractState> {
     fn get_liquidity(
         self: @TContractState, token_a: ContractAddress, token_b: ContractAddress,
     ) -> (u256, u256);
+    fn get_ordered_token_pair(
+        self: @TContractState, token_a: ContractAddress, token_b: ContractAddress,
+    ) -> PoolKey;
 
     // External functions
     fn swap_exact_tokens_for_tokens(
@@ -64,11 +68,11 @@ struct SwapRoute {
     amounts: Span<u256>,
 }
 
-#[derive(Copy, Drop, Serde, starknet::Store)]
-struct LiquidityPool {
-    token_a: ContractAddress,
-    token_b: ContractAddress,
-    reserve_a: u256,
-    reserve_b: u256,
-    total_supply: u256,
+#[derive(Copy, Drop, Serde, Hash, starknet::Store)]
+pub struct LiquidityPool {
+    pub token_a: ContractAddress,
+    pub token_b: ContractAddress,
+    pub reserve_a: u256,
+    pub reserve_b: u256,
+    pub total_supply: u256,
 }
