@@ -60,6 +60,8 @@ pub trait IInheritXSwap<TContractState> {
         recipient: ContractAddress,
         deadline: u64,
     ) -> (u256, u256);
+
+    fn add_supported_token(ref self: TContractState, token: ContractAddress);
 }
 
 #[derive(Copy, Drop, Serde)]
