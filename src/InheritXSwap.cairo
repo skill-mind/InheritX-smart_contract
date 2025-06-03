@@ -444,8 +444,50 @@ pub mod InheritXSwap {
             token_out: ContractAddress,
             amount_in: u256,
         ) -> u256 {
-            // Implementation will be added in a separate PR
-            0
+            // Input validation
+            assert(token_in.is_non_zero() && token_out.is_non_zero(), 'INVALID_TOKENS');
+            assert(token_in != token_out, 'IDENTICAL_TOKENS');
+            assert(amount_in > 0, 'INVALID_AMOUNT_IN');
+
+            // Ensure both tokens are supported
+            assert(
+                self.supported_tokens.entry(token_in).read()
+                    && self.supported_tokens.entry(token_out).read(),
+                'TOKENS_NOT_SUPPORTED',
+            );
+
+            // Get the ordered token pair to access the pool
+            let pool_key = PrivateFunctions::_get_ordered_pair(token_in, token_out);
+            let pool = self.pools.entry(pool_key).read();
+
+            // Validate pool exists and has liquidity
+            assert(pool.total_supply > 0, 'POOL_NOT_FOUND');
+            assert(pool.reserve_a > 0 && pool.reserve_b > 0, 'INSUFFICIENT_LIQUIDITY');
+
+            // Determine which reserve corresponds to input/output tokens
+            let (reserve_in, reserve_out) = if token_in == pool_key.token_a {
+                (pool.reserve_a, pool.reserve_b)
+            } else {
+                (pool.reserve_b, pool.reserve_a)
+            };
+
+            // Calculate swap rate using constant product formula: (x * y = k)
+            // For swap: amount_out = (amount_in * reserve_out) / (reserve_in + amount_in)
+            let numerator = amount_in * reserve_out;
+            let denominator = reserve_in + amount_in;
+
+            // Ensure we don't divide by zero (should be prevented by liquidity checks above)
+            assert(denominator > 0, 'CALCULATION_ERROR');
+
+            let amount_out = numerator / denominator;
+
+            // Ensure the swap would result in a non-zero output
+            assert(amount_out > 0, 'INSUFFICIENT_OUTPUT_AMOUNT');
+
+            // Additional check: ensure we don't drain the output reserve
+            assert(amount_out < reserve_out, 'EXCESSIVE_INPUT_AMOUNT');
+
+            amount_out
         }
 
         fn swap_exact_tokens_for_tokens(

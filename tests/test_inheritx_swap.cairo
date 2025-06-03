@@ -572,4 +572,102 @@ mod tests {
                 999_u64 // Deadline already passed
             );
     }
+
+    #[test]
+    fn test_get_swap_rate_logic() {
+        let (swap_dispatcher, swap_address) = deploy_inheritx_swap();
+        let (eth, strk, _) = deploy_tokens();
+        let user = steph();
+        let token_owner = emarc();
+
+        // Mint & approve 1000 ETH and 2000 STRK to pool-creator
+        mint_and_approve(eth.clone(), token_owner, user, 1000_u256, swap_address);
+        mint_and_approve(strk.clone(), token_owner, user, 2000_u256, swap_address);
+
+        // Create pool with 1000 ETH / 2000 STRK
+        start_cheat_caller_address(swap_address, user);
+        start_cheat_block_timestamp(swap_address, 500);
+        let (_amt_a, _amt_b) = swap_dispatcher
+            .add_liquidity(
+                eth.contract_address,
+                strk.contract_address,
+                1000_u256, // amount_a_desired
+                2000_u256, // amount_b_desired
+                900_u256, // amount_a_min
+                1800_u256, // amount_b_min
+                user,
+                1000_u64 // deadline
+            );
+        stop_cheat_block_timestamp(swap_address);
+        stop_cheat_caller_address(swap_address);
+
+        // Now query: swap 100 ETH → STRK
+        // expected_out = floor((100 * 2000) / (1000 + 100)) = floor(200000 / 1100) = 181
+        let amount_out: u256 = swap_dispatcher
+            .get_swap_rate(eth.contract_address, strk.contract_address, 100_u256);
+        assert!(amount_out == 181_u256, "Expected 181 STRK, got {}", amount_out);
+    }
+
+    #[test]
+    #[should_panic(expected: ('INVALID_TOKENS',))]
+    fn test_get_swap_rate_invalid_tokens() {
+        let (swap_dispatcher, _swap_address) = deploy_inheritx_swap();
+        let (eth, strk, _) = deploy_tokens();
+
+        // Case A: token_in == 0
+        swap_dispatcher.get_swap_rate(zero(), strk.contract_address, 100_u256);
+    }
+
+    #[test]
+    #[should_panic(expected: ('IDENTICAL_TOKENS',))]
+    fn test_get_swap_rate_identical_tokens() {
+        let (swap_dispatcher, _swap_address) = deploy_inheritx_swap();
+        let (eth, _strk, _) = deploy_tokens();
+
+        // Both token_in and token_out are the same non-zero address
+        swap_dispatcher.get_swap_rate(eth.contract_address, eth.contract_address, 50_u256);
+    }
+
+    #[test]
+    #[should_panic(expected: ('INVALID_AMOUNT_IN',))]
+    fn test_get_swap_rate_amount_zero() {
+        let (swap_dispatcher, swap_address) = deploy_inheritx_swap();
+        let (eth, strk, _) = deploy_tokens();
+        let user = steph();
+        let token_owner = emarc();
+
+        // set up a valid pool
+        mint_and_approve(eth.clone(), token_owner, user, 500_u256, swap_address);
+        mint_and_approve(strk.clone(), token_owner, user, 1000_u256, swap_address);
+
+        // Create pool with 500 ETH / 1000 STRK
+        start_cheat_caller_address(swap_address, user);
+        start_cheat_block_timestamp(swap_address, 400);
+        swap_dispatcher
+            .add_liquidity(
+                eth.contract_address,
+                strk.contract_address,
+                500_u256,
+                1000_u256,
+                450_u256,
+                900_u256,
+                user,
+                1000_u64,
+            );
+        stop_cheat_block_timestamp(swap_address);
+        stop_cheat_caller_address(swap_address);
+        // Now query: swap 0 ETH → STRK
+        // This should panic with "INVALID_AMOUNT_IN"
+        swap_dispatcher.get_swap_rate(eth.contract_address, strk.contract_address, 0_u256);
+    }
+
+    #[test]
+    #[should_panic(expected: ('TOKENS_NOT_SUPPORTED',))]
+    fn test_get_swap_rate_unsupported_tokens() {
+        let (swap_dispatcher, _swap_address) = deploy_inheritx_swap();
+        let (_eth, strk, usdc) = deploy_tokens();
+
+        swap_dispatcher.get_swap_rate(usdc.contract_address, strk.contract_address, 100_u256);
+    }
 }
+

@@ -40,6 +40,7 @@ cd InheritX-smart_contract
 **Create a branch for your feature or bug fix:**
 ```bash
   git checkout -b feature/<Issue title>
+  git checkout -b feature/Implementation_of_get_swap_rate_logic_107
 ```
 
 ### 5. Make Changes and Commit
