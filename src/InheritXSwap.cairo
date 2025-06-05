@@ -62,17 +62,28 @@ pub mod InheritXSwap {
 
     // Events
     #[event]
-    #[derive(Drop, starknet::Event)]
+    #[derive(Drop, Destruct, starknet::Event)]
     pub enum Event {
         LiquidityAdded: LiquidityAdded,
         LiquidityRemoved: LiquidityRemoved,
         TokenAdded: TokenAdded,
+        Swap: Swap,
         #[flat]
         ERC20Event: ERC20Component::Event,
         #[flat]
         OwnableEvent: OwnableComponent::Event,
         #[flat]
         ReentrancyGuardEvent: ReentrancyGuardComponent::Event,
+    }
+
+    #[derive(Drop, Clone, starknet::Event)]
+    pub struct Swap {
+        pub sender: ContractAddress,
+        pub token_in: ContractAddress,
+        pub token_out: ContractAddress,
+        pub amount_in: u256,
+        pub amount_out: u256,
+        pub recipient: ContractAddress,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -468,8 +479,105 @@ pub mod InheritXSwap {
             recipient: ContractAddress,
             deadline: u64,
         ) -> u256 {
-            // Implementation will be added in a separate PR
-            0
+            self.reentrancy_guard.start();
+
+            // Input validation with descriptive error messages
+            assert(amount_out > 0, 'Invalid amount: must be > 0');
+            assert(max_amount_in > 0, 'Invalid max input: must be > 0');
+            assert(recipient.is_non_zero(), 'Invalid recipient: zero address');
+            assert(get_block_timestamp() <= deadline, 'Deadline exceeded');
+            assert(path.len() >= 2, 'Invalid path: need min 2 tokens');
+
+            // Validate all addresses in path are non-zero and supported
+            let mut i = 0;
+            while i != path.len() {
+                let token = path.at(i);
+                assert(token.is_non_zero(), 'Invalid path: zero address');
+                assert(self.supported_tokens.read(*token), 'Unsupported token in path');
+                i += 1;
+            }
+
+            // Only support single-hop swaps (path.len() == 2)
+            assert(path.len() == 2, 'Multi-hop not implemented');
+
+            let token_in = path.at(0);
+            let token_out = path.at(1);
+
+            // Get pool key and reserves
+            let pool_key = PrivateFunctions::_get_ordered_pair(*token_in, *token_out);
+            let pool = self.pools.read(pool_key);
+            assert(pool.total_supply > 0, 'Pool not found');
+            assert(pool.reserve_a > 0 && pool.reserve_b > 0, 'Empty pool');
+
+            // Determine which token is input and which is output
+            let (reserve_in, reserve_out) = if *token_in == pool.token_a {
+                (pool.reserve_a, pool.reserve_b)
+            } else {
+                (pool.reserve_b, pool.reserve_a)
+            };
+
+            // Calculate required input using constant product formula with 0.3% fee
+            // Formula: amount_in = (reserve_in * amount_out * 1000) / ((reserve_out - amount_out) *
+            // 997) + 1
+            assert(reserve_out > amount_out, 'Insufficient output liquidity');
+            let numerator = reserve_in * amount_out * 1000_u256;
+            let denominator = (reserve_out - amount_out) * 997_u256;
+            let mut amount_in = numerator / denominator + 1_u256;
+
+            // Ensure the calculated input amount doesn't exceed the user's maximum
+            assert(amount_in <= max_amount_in, 'Excessive input amount');
+
+            // Get caller and contract addresses
+            let caller = get_caller_address();
+            let contract = get_contract_address();
+
+            // Create token dispatchers for interacting with the ERC20 tokens
+            let input_token = IERC20Dispatcher { contract_address: *token_in };
+            let output_token = IERC20Dispatcher { contract_address: *token_out };
+
+            // Verify caller has sufficient balance and allowance
+            assert(input_token.balance_of(caller) >= amount_in, 'Insufficient balance');
+            assert(input_token.allowance(caller, contract) >= amount_in, 'Insufficient allowance');
+
+            // Transfer input tokens from caller to contract
+            input_token.transfer_from(caller, contract, amount_in);
+
+            // Transfer output tokens from contract to recipient
+            assert(
+                output_token.balance_of(contract) >= amount_out, 'Insufficient contract balance',
+            );
+            output_token.transfer(recipient, amount_out);
+
+            // Update pool reserves
+            let new_reserve_in = reserve_in + amount_in;
+            let new_reserve_out = reserve_out - amount_out;
+
+            // Update the pool with the new reserves, maintaining the correct order
+            if *token_in == pool.token_a {
+                PrivateFunctions::_update(ref self, pool_key, new_reserve_in, new_reserve_out);
+            } else {
+                PrivateFunctions::_update(ref self, pool_key, new_reserve_out, new_reserve_in);
+            }
+
+            self
+                .emit(
+                    Swap {
+                        sender: caller,
+                        token_in: *token_in,
+                        token_out: *token_out,
+                        amount_in,
+                        amount_out,
+                        recipient,
+                    },
+                );
+
+            self.reentrancy_guard.end();
+
+            amount_in
+        }
+
+        fn add_supported_token(ref self: ContractState, token: ContractAddress) {
+            ExternalImpl::add_supported_token_to_contract(ref self, token);
         }
     }
 
@@ -477,7 +585,7 @@ pub mod InheritXSwap {
     #[abi(per_item)]
     impl ExternalImpl of ExternalTrait {
         #[external(v0)]
-        fn add_supported_token(ref self: ContractState, token: ContractAddress) {
+        fn add_supported_token_to_contract(ref self: ContractState, token: ContractAddress) {
             self.ownable.assert_only_owner();
             assert(token.is_non_zero(), 'INVALID_TOKEN');
             assert(!self.supported_tokens.entry(token).read(), 'TOKEN_ALREADY_SUPPORTED');
