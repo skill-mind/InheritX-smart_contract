@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod tests {
     use core::array::ArrayTrait;
-    use core::num::traits::{Sqrt, Zero};
+    use core::num::traits::{Pow, Sqrt, Zero};
     use inheritx::InheritXSwap::InheritXSwap;
-    use inheritx::InheritXSwap::InheritXSwap::{LiquidityAdded, LiquidityRemoved};
+    use inheritx::InheritXSwap::InheritXSwap::{Event, LiquidityAdded, LiquidityRemoved, Swap};
     use inheritx::interfaces::IInheritXSwap::{
         IInheritXSwap, IInheritXSwapDispatcher, IInheritXSwapDispatcherTrait,
     };
@@ -558,7 +558,6 @@ mod tests {
         // Set block timestamp to 1000
         start_cheat_block_timestamp(swap_address, 1000);
 
-        // Attempt to add liquidity with deadline in the past (999)
         start_cheat_caller_address(swap_address, user);
         swap_dispatcher
             .add_liquidity(
@@ -588,6 +587,31 @@ mod tests {
         start_cheat_caller_address(swap_address, user);
         start_cheat_block_timestamp(swap_address, 500);
         let (_amt_a, _amt_b) = swap_dispatcher
+
+    fn test_swap_tokens_for_exact_tokens_typical_case() {
+        // Setup
+        let (swap_dispatcher, swap_address) = deploy_inheritx_swap();
+        let (eth, strk, _) = deploy_tokens();
+        let token_owner = emarc();
+        let sender = steph();
+        let recipient = john();
+
+        let mut event_spy = spy_events();
+
+        // Add tokens to supported list
+        start_cheat_caller_address(swap_address, owner());
+        swap_dispatcher.add_supported_token(eth.contract_address);
+        swap_dispatcher.add_supported_token(strk.contract_address);
+        stop_cheat_caller_address(swap_address);
+
+        // Setup liquidity pool with 1000 ETH and 2000 STRK
+        mint_and_approve(eth, token_owner, owner(), 1000_u256, swap_address);
+        mint_and_approve(strk, token_owner, owner(), 2000_u256, swap_address);
+
+        start_cheat_caller_address(swap_address, owner());
+        start_cheat_block_timestamp(swap_address, 500);
+
+        swap_dispatcher
             .add_liquidity(
                 eth.contract_address,
                 strk.contract_address,
@@ -643,6 +667,127 @@ mod tests {
         // Create pool with 500 ETH / 1000 STRK
         start_cheat_caller_address(swap_address, user);
         start_cheat_block_timestamp(swap_address, 400);
+                owner(),
+                1000_u64 // deadline
+            );
+
+        stop_cheat_block_timestamp(swap_address);
+        stop_cheat_caller_address(swap_address);
+
+        // Setup sender with tokens for swap
+        mint_and_approve(eth, token_owner, sender, 200_u256, swap_address);
+
+        // Create path for swap
+        let mut path = ArrayTrait::new();
+        path.append(eth.contract_address);
+        path.append(strk.contract_address);
+
+        // Execute swap
+        start_cheat_caller_address(swap_address, sender);
+        start_cheat_block_timestamp(swap_address, 600);
+
+        let amount_in = swap_dispatcher
+            .swap_tokens_for_exact_tokens(
+                50_u256, // Exact amount of STRK to receive
+                200_u256, // Maximum ETH willing to spend
+                path,
+                recipient,
+                1000_u64 // deadline
+            );
+
+        stop_cheat_block_timestamp(swap_address);
+        stop_cheat_caller_address(swap_address);
+
+        // Verify results
+        assert(amount_in > 0, 'Input amount should be positive');
+        assert(amount_in < 200_u256, 'Should use less than max input');
+
+        // Check balances
+        assert(eth.balance_of(sender) == 200_u256 - amount_in, 'Incorrect sender ETH balance');
+        assert(strk.balance_of(recipient) == 50_u256, 'Recipient should have 50 STRK');
+
+        // Verify pool state
+        let (reserve_eth, reserve_strk) = swap_dispatcher
+            .get_liquidity(eth.contract_address, strk.contract_address);
+        assert(reserve_eth == 1000_u256 + amount_in, 'Incorrect ETH reserve');
+        assert(reserve_strk == 2000_u256 - 50_u256, 'Incorrect STRK reserve');
+
+        event_spy
+            .assert_emitted(
+                @array![
+                    (
+                        swap_dispatcher.contract_address,
+                        Event::Swap(
+                            Swap {
+                                sender,
+                                token_in: eth.contract_address,
+                                token_out: strk.contract_address,
+                                amount_in,
+                                amount_out: 50_u256,
+                                recipient,
+                            },
+                        ),
+                    ),
+                ],
+            );
+    }
+
+    #[test]
+    #[should_panic(expected: ('Invalid amount: must be > 0',))]
+    fn test_swap_tokens_for_exact_tokens_zero_amount() {
+        // Setup
+        let (swap_dispatcher, swap_address) = deploy_inheritx_swap();
+        let (eth, strk, _) = deploy_tokens();
+        let sender = steph();
+
+        // Add tokens to supported list
+        start_cheat_caller_address(swap_address, owner());
+        swap_dispatcher.add_supported_token(eth.contract_address);
+        swap_dispatcher.add_supported_token(strk.contract_address);
+        stop_cheat_caller_address(swap_address);
+
+        // Create path for swap
+        let mut path = ArrayTrait::new();
+        path.append(eth.contract_address);
+        path.append(strk.contract_address);
+
+        // Execute swap with zero amount_out (should fail)
+        start_cheat_caller_address(swap_address, sender);
+        start_cheat_block_timestamp(swap_address, 600);
+
+        swap_dispatcher
+            .swap_tokens_for_exact_tokens(
+                0_u256, // Zero amount to receive (should fail)
+                100_u256, // Maximum input
+                path,
+                john(),
+                1000_u64 // deadline
+            );
+    }
+
+    #[test]
+    #[should_panic(expected: ('Excessive input amount',))]
+    fn test_swap_tokens_for_exact_tokens_excessive_input() {
+        // Setup
+        let (swap_dispatcher, swap_address) = deploy_inheritx_swap();
+        let (eth, strk, _) = deploy_tokens();
+        let token_owner = emarc();
+        let sender = steph();
+        let recipient = john();
+
+        // Add tokens to supported list
+        start_cheat_caller_address(swap_address, owner());
+        swap_dispatcher.add_supported_token(eth.contract_address);
+        swap_dispatcher.add_supported_token(strk.contract_address);
+        stop_cheat_caller_address(swap_address);
+
+        // Setup liquidity pool with 1000 ETH and 2000 STRK
+        mint_and_approve(eth, token_owner, owner(), 1000_u256, swap_address);
+        mint_and_approve(strk, token_owner, owner(), 2000_u256, swap_address);
+
+        start_cheat_caller_address(swap_address, owner());
+        start_cheat_block_timestamp(swap_address, 500);
+        
         swap_dispatcher
             .add_liquidity(
                 eth.contract_address,
@@ -668,6 +813,231 @@ mod tests {
         let (_eth, strk, usdc) = deploy_tokens();
 
         swap_dispatcher.get_swap_rate(usdc.contract_address, strk.contract_address, 100_u256);
+                1000_u256, // amount_a_desired
+                2000_u256, // amount_b_desired
+                900_u256, // amount_a_min
+                1800_u256, // amount_b_min
+                owner(),
+                1000_u64 // deadline
+            );
+
+        stop_cheat_block_timestamp(swap_address);
+        stop_cheat_caller_address(swap_address);
+
+        // Setup sender with tokens for swap
+        mint_and_approve(eth, token_owner, sender, 200_u256, swap_address);
+
+        // Create path for swap
+        let mut path = ArrayTrait::new();
+        path.append(eth.contract_address);
+        path.append(strk.contract_address);
+
+        // Execute swap with insufficient max_amount_in
+        start_cheat_caller_address(swap_address, sender);
+        start_cheat_block_timestamp(swap_address, 600);
+
+        // Calculate required input for 100 STRK (should be more than 30)
+        swap_dispatcher
+            .swap_tokens_for_exact_tokens(
+                100_u256, // Amount of STRK to receive
+                30_u256, // Maximum ETH willing to spend (too low)
+                path,
+                recipient,
+                1000_u64 // deadline
+            );
+    }
+
+    #[test]
+    #[should_panic(expected: ('Deadline exceeded',))]
+    fn test_swap_tokens_for_exact_tokens_expired_deadline() {
+        // Setup
+        let (swap_dispatcher, swap_address) = deploy_inheritx_swap();
+        let (eth, strk, _) = deploy_tokens();
+        let sender = steph();
+
+        // Add tokens to supported list
+        start_cheat_caller_address(swap_address, owner());
+        swap_dispatcher.add_supported_token(eth.contract_address);
+        swap_dispatcher.add_supported_token(strk.contract_address);
+        stop_cheat_caller_address(swap_address);
+
+        // Create path for swap
+        let mut path = ArrayTrait::new();
+        path.append(eth.contract_address);
+        path.append(strk.contract_address);
+
+        // Execute swap with expired deadline
+        start_cheat_caller_address(swap_address, sender);
+        start_cheat_block_timestamp(swap_address, 1000); // Current time is 1000
+
+        swap_dispatcher
+            .swap_tokens_for_exact_tokens(
+                50_u256, // Amount to receive
+                200_u256, // Maximum input
+                path,
+                john(),
+                500_u64 // Deadline in the past (500 < 1000)
+            );
+    }
+    #[test]
+    #[should_panic(expected: ('Invalid path: need min 2 tokens',))]
+    fn test_swap_tokens_for_exact_tokens_invalid_path() {
+        // Setup
+        let (swap_dispatcher, swap_address) = deploy_inheritx_swap();
+        let sender = steph();
+
+        // Create empty path for swap (invalid)
+        let path = ArrayTrait::new();
+
+        // Execute swap with invalid path
+        start_cheat_caller_address(swap_address, sender);
+        start_cheat_block_timestamp(swap_address, 600);
+
+        swap_dispatcher
+            .swap_tokens_for_exact_tokens(
+                50_u256, // Amount to receive
+                200_u256, // Maximum input
+                path, // Empty path (invalid)
+                john(),
+                1000_u64 // deadline
+            );
+    }
+    #[test]
+    #[should_panic(expected: ('Unsupported token in path',))]
+    fn test_swap_tokens_for_exact_tokens_unsupported_token() {
+        // Setup
+        let (swap_dispatcher, swap_address) = deploy_inheritx_swap();
+        let (eth, strk, _) = deploy_tokens();
+        let sender = steph();
+
+        // Create path with unsupported tokens
+        let mut path = ArrayTrait::new();
+        path.append(eth.contract_address);
+        path.append(strk.contract_address);
+
+        // Execute swap with unsupported tokens
+        start_cheat_caller_address(swap_address, sender);
+        start_cheat_block_timestamp(swap_address, 600);
+
+        swap_dispatcher
+            .swap_tokens_for_exact_tokens(
+                50_u256, // Amount to receive
+                200_u256, // Maximum input
+                path, // Path with unsupported tokens
+                john(),
+                1000_u64 // deadline
+            );
+    }
+
+    #[test]
+    #[should_panic(expected: ('Pool not found',))]
+    fn test_swap_tokens_for_exact_tokens_no_pool() {
+        // Setup
+        let (swap_dispatcher, swap_address) = deploy_inheritx_swap();
+        let (eth, strk, _) = deploy_tokens();
+        let sender = steph();
+
+        // Add tokens to supported list but don't create a pool
+        start_cheat_caller_address(swap_address, owner());
+        swap_dispatcher.add_supported_token(eth.contract_address);
+        swap_dispatcher.add_supported_token(strk.contract_address);
+        stop_cheat_caller_address(swap_address);
+
+        // Create path for swap
+        let mut path = ArrayTrait::new();
+        path.append(eth.contract_address);
+        path.append(strk.contract_address);
+
+        // Execute swap without a pool
+        start_cheat_caller_address(swap_address, sender);
+        start_cheat_block_timestamp(swap_address, 600);
+
+        swap_dispatcher
+            .swap_tokens_for_exact_tokens(
+                50_u256, // Amount to receive
+                200_u256, // Maximum input
+                path,
+                john(),
+                1000_u64 // deadline
+            );
+    }
+
+    #[test]
+    fn test_swap_tokens_for_exact_tokens_with_different_decimals() {
+        // Setup
+        let (swap_dispatcher, swap_address) = deploy_inheritx_swap();
+        let (eth, _, usdc) = deploy_tokens();
+        let token_owner = emarc();
+        let sender = steph();
+        let recipient = john();
+
+        // Add tokens to supported list
+        start_cheat_caller_address(swap_address, owner());
+        swap_dispatcher.add_supported_token(eth.contract_address);
+        swap_dispatcher.add_supported_token(usdc.contract_address);
+        stop_cheat_caller_address(swap_address);
+
+        // USDC has 6 decimals vs ETH's 18
+        let eth_amount = 1000_u256 * 10_u256.pow(18);
+        let usdc_amount = 2000_u256 * 10_u256.pow(6);
+
+        // Setup liquidity pool with different decimal tokens
+        mint_and_approve(eth, token_owner, owner(), eth_amount, swap_address);
+        mint_and_approve(usdc, token_owner, owner(), usdc_amount, swap_address);
+
+        start_cheat_caller_address(swap_address, owner());
+        start_cheat_block_timestamp(swap_address, 500);
+
+        swap_dispatcher
+            .add_liquidity(
+                eth.contract_address,
+                usdc.contract_address,
+                eth_amount,
+                usdc_amount,
+                eth_amount * 9 / 10,
+                usdc_amount * 9 / 10,
+                owner(),
+                1000_u64,
+            );
+
+        stop_cheat_block_timestamp(swap_address);
+        stop_cheat_caller_address(swap_address);
+
+        // Setup sender with tokens for swap
+        let sender_eth = 100_u256 * 10_u256.pow(18);
+        mint_and_approve(eth, token_owner, sender, sender_eth, swap_address);
+
+        // Create path for swap
+        let mut path = ArrayTrait::new();
+        path.append(eth.contract_address);
+        path.append(usdc.contract_address);
+
+        // Execute swap
+        start_cheat_caller_address(swap_address, sender);
+        start_cheat_block_timestamp(swap_address, 600);
+
+        let usdc_out = 100_u256 * 10_u256.pow(6); // 100 USDC
+        let max_eth_in = 60_u256 * 10_u256.pow(18); // 60 ETH
+
+        let amount_in = swap_dispatcher
+            .swap_tokens_for_exact_tokens(usdc_out, max_eth_in, path, recipient, 1000_u64);
+
+        stop_cheat_block_timestamp(swap_address);
+        stop_cheat_caller_address(swap_address);
+
+        // Verify results
+        assert(amount_in > 0, 'Input amount should be positive');
+        assert(amount_in < max_eth_in, 'Should use less than max input');
+
+        // Check balances
+        assert(eth.balance_of(sender) == sender_eth - amount_in, 'Incorrect sender ETH balance');
+        assert(usdc.balance_of(recipient) == usdc_out, 'Should have exact USDC');
+
+        // Verify pool state
+        let (reserve_eth, reserve_usdc) = swap_dispatcher
+            .get_liquidity(eth.contract_address, usdc.contract_address);
+        assert(reserve_eth == eth_amount + amount_in, 'Incorrect ETH reserve');
+        assert(reserve_usdc == usdc_amount - usdc_out, 'Incorrect USDC reserve');
     }
 }
 
