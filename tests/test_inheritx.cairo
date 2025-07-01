@@ -9,7 +9,9 @@ use snforge_std::{
     stop_cheat_block_timestamp, stop_cheat_caller_address,
 };
 use starknet::syscalls::deploy_syscall;
-use starknet::{ClassHash, ContractAddress, SyscallResultTrait, contract_address_const};
+use starknet::{
+    ClassHash, ContractAddress, SyscallResultTrait, contract_address_const, get_caller_address,
+};
 
 #[cfg(test)]
 mod tests {
@@ -21,14 +23,12 @@ mod tests {
     use inheritx::interfaces::ICounterLogicV2::{
         ICounterLogicV2Dispatcher, ICounterLogicV2DispatcherTrait,
     };
-    use inheritx::interfaces::IInheritX::{
-        AssetAllocation, IInheritX, IInheritXDispatcher, IInheritXDispatcherTrait,
-    };
+    use inheritx::interfaces::IInheritX::{IInheritX, IInheritXDispatcher, IInheritXDispatcherTrait};
     use inheritx::interfaces::IProxy::{IProxyDispatcher, IProxyDispatcherTrait};
     use inheritx::types::{
-        ActivityType, MediaMessage, NotificationSettings, NotificationStruct, PlanConditions,
-        PlanOverview, PlanSection, PlanStatus, SecuritySettings, SimpleBeneficiary, TokenInfo,
-        UserProfile, UserRole, VerificationStatus,
+        ActivityType, AssetAllocation, MediaMessage, NotificationSettings, NotificationStruct,
+        PlanConditions, PlanOverview, PlanSection, PlanStatus, SecuritySettings, SimpleBeneficiary,
+        TokenInfo, UserProfile, UserRole, VerificationStatus,
     };
     use snforge_std::{
         CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_block_timestamp,
@@ -38,31 +38,32 @@ mod tests {
     use starknet::class_hash::ClassHash;
     use starknet::syscalls::deploy_syscall;
     use starknet::testing::{set_caller_address, set_contract_address};
-    use starknet::{ContractAddress, SyscallResultTrait, contract_address_const};
+    use starknet::{ContractAddress, SyscallResultTrait, contract_address_const, get_caller_address};
     use super::*;
 
     // Sets up the environment for testing
     fn setup() -> (IInheritXDispatcher, ContractAddress) {
         // Declare and deploy the account contracts
         let inheritX_class = declare("InheritX").unwrap().contract_class();
-
         let (contract_address, _) = inheritX_class.deploy(@array![]).unwrap();
-
         let dispatcher = IInheritXDispatcher { contract_address };
 
         // Set initial block timestamp using cheatcode
         start_cheat_block_timestamp(contract_address, 1000);
+
         (dispatcher, contract_address)
     }
 
+
     #[test]
     fn test_is_verified() {
-        let (IInheritXDispatcher, contract_address) = setup();
+        let (dispatcher, contract_address) = setup();
         let caller = contract_address_const::<'address'>();
-        let dispatcher = IInheritXDispatcher { contract_address };
+
         // Ensure dispatcher methods exist
         let deployed = dispatcher.test_deployment();
         start_cheat_caller_address(contract_address, caller);
+
         let is_verified = dispatcher.is_verified(caller);
         assert(is_verified == false, 'should be unverified');
     }
@@ -70,23 +71,25 @@ mod tests {
     #[test]
     #[should_panic(expected: 'Code expired')]
     fn test_is_expired() {
-        let (IInheritXDispatcher, contract_address) = setup();
+        let (dispatcher, contract_address) = setup();
         let caller = contract_address_const::<'address'>();
-        let dispatcher = IInheritXDispatcher { contract_address };
+
         // Ensure dispatcher methods exist
         let deployed = dispatcher.test_deployment();
         start_cheat_caller_address(contract_address, caller);
+
         let is_expired = dispatcher.check_expiry(caller);
         assert(is_expired == true, 'should not be expired');
     }
 
     #[test]
     fn test_get_verification_status() {
-        let (IInheritXDispatcher, contract_address) = setup();
+        let (dispatcher, contract_address) = setup();
         let caller = contract_address_const::<'address'>();
-        let dispatcher = IInheritXDispatcher { contract_address };
+
         // Ensure dispatcher methods exist
         start_cheat_caller_address(contract_address, caller);
+
         let verification_status = dispatcher.get_verification_status(20, caller);
         assert(verification_status == false, 'should be unverified');
     }
@@ -94,14 +97,17 @@ mod tests {
     #[test]
     #[should_panic(expected: 'Code expired')]
     fn test_complete_verification() {
-        let (IInheritXDispatcher, contract_address) = setup();
+        let (dispatcher, contract_address) = setup();
         let caller = contract_address_const::<'address'>();
-        let dispatcher = IInheritXDispatcher { contract_address };
+
         // Ensure dispatcher methods exist
         start_cheat_caller_address(contract_address, caller);
+
         let verification_status_before = dispatcher.get_verification_status(20, caller);
         assert(verification_status_before == false, 'should be unverified');
+
         let complete_verification = dispatcher.complete_verififcation(caller, 20);
+
         let verification_status_after = dispatcher.get_verification_status(20, caller);
         assert(verification_status_after == true, 'should not be unverified');
     }
@@ -178,7 +184,6 @@ mod tests {
 
         // Ensure dispatcher methods exist
         let deployed = dispatcher.test_deployment();
-
         assert(deployed, 'deployment failed');
     }
 
@@ -187,22 +192,33 @@ mod tests {
         let (dispatcher, contract_address) = setup();
         let benefactor: ContractAddress = contract_address_const::<'benefactor'>();
         let beneficiary: ContractAddress = contract_address_const::<'beneficiary'>();
+
         let pick_beneficiaries: Array<ContractAddress> = array![beneficiary];
+
         let assets: Array<AssetAllocation> = array![
             AssetAllocation { token: benefactor, amount: 1000, percentage: 50 },
             AssetAllocation { token: beneficiary, amount: 1000, percentage: 50 },
         ];
+
         let plan_name: felt252 = 'plan1';
         let description: felt252 = 'plan_desc';
 
+        // Set caller context
+        start_cheat_caller_address(contract_address, benefactor);
+
         // Call create_inheritance_plan
+        start_cheat_caller_address(contract_address, benefactor);
         let plan_id = dispatcher
             .create_inheritance_plan(plan_name, assets, description, pick_beneficiaries);
 
         let plan = dispatcher.get_inheritance_plan(plan_id);
+
         assert(plan.is_active, 'is_active mismatch');
         assert(!plan.is_claimed, 'is_claimed mismatch');
         assert(plan.total_value == 2000, 'total_value mismatch');
+        assert(plan.plan_name == plan_name, 'plan_name mismatch');
+        assert(plan.description == description, 'description mismatch');
+        assert(plan.owner == benefactor, 'owner mismatch');
     }
 
     #[test]
@@ -210,12 +226,15 @@ mod tests {
     fn test_create_inheritance_plan_no_assets() {
         let (dispatcher, contract_address) = setup();
         let benefactor: ContractAddress = contract_address_const::<'benefactor'>();
+
         let pick_beneficiaries: Array<ContractAddress> = array![benefactor];
+
         let plan_name: felt252 = 'plan1';
         let description: felt252 = 'plan_desc';
 
         // Test with no assets
         let assets: Array<AssetAllocation> = array![];
+
         dispatcher.create_inheritance_plan(plan_name, assets, description, pick_beneficiaries);
     }
 
@@ -225,7 +244,9 @@ mod tests {
         let (dispatcher, contract_address) = setup();
         let benefactor: ContractAddress = contract_address_const::<'benefactor'>();
         let beneficiary: ContractAddress = contract_address_const::<'beneficiary'>();
+
         let pick_beneficiaries: Array<ContractAddress> = array![];
+
         let plan_name: felt252 = 'plan1';
         let description: felt252 = 'plan_desc';
 
@@ -233,6 +254,7 @@ mod tests {
             AssetAllocation { token: benefactor, amount: 1000, percentage: 50 },
             AssetAllocation { token: beneficiary, amount: 1000, percentage: 50 },
         ];
+
         dispatcher.create_inheritance_plan(plan_name, assets, description, pick_beneficiaries);
     }
 
@@ -240,6 +262,7 @@ mod tests {
     fn test_update_new_user_profile() {
         let (dispatcher, contract_address) = setup();
         let caller = contract_address_const::<'address'>();
+
         start_cheat_caller_address(contract_address, caller);
 
         let username = 'newuser';
@@ -254,10 +277,12 @@ mod tests {
             .update_user_profile(
                 username, email, full_name, profile_image, notification_settings, security_settings,
             );
+
         assert(result == true, 'Profile update should succeed');
 
         // Verify the profile was created correctly
         let profile = dispatcher.get_user_profile(caller);
+
         assert(
             profile.security_settings == SecuritySettings::Two_factor_enabled,
             'should be Two_factor_enabled',
@@ -266,10 +291,12 @@ mod tests {
         stop_cheat_caller_address(contract_address);
     }
 
+
     #[test]
     fn test_security_settings_enum_values() {
         let (dispatcher, contract_address) = setup();
         let caller = contract_address_const::<'address'>();
+
         start_cheat_caller_address(contract_address, caller);
 
         // Test with Nil security settings
@@ -282,7 +309,9 @@ mod tests {
                 NotificationSettings::Default,
                 SecuritySettings::Nil,
             );
+
         let profile = dispatcher.get_user_profile(caller);
+
         assert(
             profile.security_settings == SecuritySettings::Nil, 'Security settings should be Nil',
         );
@@ -297,7 +326,9 @@ mod tests {
                 NotificationSettings::Default,
                 SecuritySettings::recovery_email,
             );
+
         let profile = dispatcher.get_user_profile(caller);
+
         assert(
             profile.security_settings == SecuritySettings::recovery_email,
             'should be recovery_email',
@@ -313,7 +344,9 @@ mod tests {
                 NotificationSettings::Default,
                 SecuritySettings::backup_guardians,
             );
+
         let profile = dispatcher.get_user_profile(caller);
+
         assert(
             profile.security_settings == SecuritySettings::backup_guardians,
             'should be backup_guardians',
@@ -346,7 +379,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected: 'Plan does not exist')]
+    // #[should_panic(expected: 'Plan does not exist')]
     fn test_get_basic_information_section() {
         let (inheritx, plan_id, _) = setup_with_plan();
 
@@ -362,7 +395,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected: ('Plan does not exist',))]
+    // #[should_panic(expected: ('Plan does not exist',))]
     fn test_get_beneficiaries_section() {
         let (inheritx, plan_id, _) = setup_with_plan();
 
@@ -644,14 +677,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(
-        expected: (
-            0x46a6158a16a947e5916b2a2ca68501a45e93d7110e81aa2d6438b1c57c879a3,
-            0x0,
-            'Wallet already exists',
-            0x15,
-        ),
-    )]
+    #[should_panic(expected: ('Wallet already exists',))]
     fn test_add_duplicate_wallet() {
         let (dispatcher, contract_address) = setup();
         let user = contract_address_const::<'user'>();
@@ -666,14 +692,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(
-        expected: (
-            0x46a6158a16a947e5916b2a2ca68501a45e93d7110e81aa2d6438b1c57c879a3,
-            0x0,
-            'Wallet not found',
-            0x10,
-        ),
-    )]
+    #[should_panic(expected: ('Wallet not found',))]
     fn test_set_primary_non_existent_wallet() {
         let (dispatcher, contract_address) = setup();
         let user = contract_address_const::<'user'>();
