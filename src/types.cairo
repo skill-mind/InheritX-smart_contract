@@ -27,7 +27,6 @@ pub struct TokenInfo {
     pub price: u256,
 }
 
-
 #[derive(Drop, Serde)]
 pub struct BeneficiaryInfo {
     name: felt252,
@@ -87,24 +86,27 @@ pub enum PlanSection {
     MediaAndRecipients: (),
 }
 
-
+// Updated InheritancePlan struct with consolidated data
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct InheritancePlan {
-    owner: ContractAddress,
-    time_lock_period: u64,
-    required_guardians: u8,
-    is_active: bool,
-    is_claimed: bool,
-    total_value: u256,
+    pub owner: ContractAddress,
+    pub plan_name: felt252,
+    pub description: felt252,
+    pub time_lock_period: u64,
+    pub required_guardians: u8,
+    pub is_active: bool,
+    pub is_claimed: bool,
+    pub total_value: u256,
+    pub creation_date: u64,
+    pub transfer_date: u64,
 }
 
-#[derive(Drop, Serde)]
+#[derive(Drop, Serde, starknet::Store)]
 pub struct AssetAllocation {
     pub token: ContractAddress,
     pub amount: u256,
     pub percentage: u8,
 }
-
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct NFTInfo {
@@ -184,7 +186,6 @@ pub enum SecuritySettings {
     allowed_ips,
 }
 
-
 #[derive(Drop, Serde, starknet::Store, Default)]
 pub enum VerificationStatus {
     #[default]
@@ -204,6 +205,7 @@ pub enum UserRole {
     Guardian,
     Admin,
 }
+
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub enum ActivityType {
     #[default]
@@ -254,6 +256,7 @@ pub struct NotificationStruct {
     pub security_alerts: bool,
     pub marketing_updates: bool,
 }
+
 #[derive(Drop, Serde, starknet::Store)]
 pub struct Wallet {
     pub address: ContractAddress,
@@ -261,4 +264,3 @@ pub struct Wallet {
     pub wallet_type: felt252,
     pub added_at: u64,
 }
-
