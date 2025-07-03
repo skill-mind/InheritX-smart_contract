@@ -1,5 +1,3 @@
-
-
 # Contributing to InheritX Smart Contract
 
 Thank you for your interest in contributing to InheritX! **InheritX** is a revolutionary blockchain-powered digital asset inheritance platform that empowers users to securely manage, transfer, and optimize their digital assets—including cryptocurrencies and NFTs—using a decentralized exchange (DEX) swap feature. Built on StarkNet, InheritX ensures transparency, security, and automation in digital estate planning.
@@ -187,5 +185,26 @@ If you encounter any issues during deployment or upgrade, please:
 1. Verify that you're using the correct class hashes
 2. Make sure you're calling functions with the correct account (owner)
 3. Check transaction receipts for detailed error messages
+
+## STARK Proof Integration (Planned)
+
+### Overview
+Starknet's STARK proofs will enable scalable, off-chain verification for complex checks (e.g., inactivity periods). While direct on-chain STARK proof verification is not yet available, InheritX is architected for future integration.
+
+### Current Implementation
+- A placeholder function `verify_claim_with_proof` is implemented in the contract and interface.
+- This function hashes claim data using Poseidon and accepts a proof parameter.
+- Currently, the function mocks verification and always returns `true`.
+- Claim data is formatted and hashed for future compatibility with STARK proof verification.
+
+### Roadmap & Next Steps
+- Monitor Starknet's roadmap for native STARK proof verification support.
+- Once available, update `verify_claim_with_proof` to perform actual proof verification.
+- Unit tests are in place to validate the placeholder logic and will be updated for real proofs.
+
+### Developer Notes
+- See `src/InheritX.cairo` and `src/interfaces/IInheritX.cairo` for the placeholder implementation.
+- See `tests/test_inheritx.cairo` for unit tests mocking proof verification.
+- This approach ensures the contract is future-proof and ready for scalable, off-chain verification as soon as Starknet supports it.
 
 Thank you for contributing to InheritX and helping us build a secure, innovative platform for digital asset inheritance!

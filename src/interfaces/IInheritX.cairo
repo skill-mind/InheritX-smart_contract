@@ -173,4 +173,12 @@ pub trait IInheritX<TContractState> {
     fn plan_has_assets(self: @TContractState, plan_id: u256) -> bool;
 
     fn check_beneficiary_plan(self: @TContractState, plan_id: u256) -> bool;
+
+    fn verify_claim_with_proof(
+        ref self: TContractState,
+        inheritance_id: u256,
+        beneficiary: ContractAddress,
+        claim_code: u256,
+        proof: Array<felt252>,
+    ) -> bool;
 }

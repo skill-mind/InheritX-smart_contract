@@ -1350,6 +1350,24 @@ mod tests {
         assert(dispatcher.is_beneficiary(plan_id, beneficiary1), 'Beneficiary 1 should exist');
         assert(dispatcher.is_beneficiary(plan_id, beneficiary2), 'Beneficiary 2 should exist');
     }
+
+    #[test]
+    fn test_verify_claim_with_proof_placeholder() {
+        let (dispatcher, contract_address) = setup();
+        let benefactor: ContractAddress = contract_address_const::<'benefactor'>();
+        let beneficiary: ContractAddress = contract_address_const::<'beneficiary'>();
+        let name: felt252 = 'John';
+        let email: felt252 = 'John@yahoo.com';
+        let personal_message = 'i love you my son';
+        let claim_code = 2563;
+        cheat_caller_address(contract_address, benefactor, CheatSpan::Indefinite);
+        let claim_id = dispatcher.create_claim(name, email, beneficiary, personal_message, 1000, claim_code);
+        // Mock proof (empty for now)
+        let proof = array![];
+        // Call the placeholder verification function
+        let verified = dispatcher.verify_claim_with_proof(claim_id, beneficiary, claim_code, proof);
+        assert(verified, 'STARK proof placeholder should return true');
+    }
 }
 
 // Counter Logic and Proxy Test Helpers

@@ -1086,5 +1086,31 @@ pub mod InheritX {
             }
             true
         }
+
+        fn verify_claim_with_proof(
+            ref self: ContractState,
+            inheritance_id: u256,
+            beneficiary: ContractAddress,
+            claim_code: u256,
+            proof: Array<felt252>,
+        ) -> bool {
+            // Retrieve claim data
+            let claim = self.funds.read(inheritance_id);
+            // Prepare data for hashing
+            let mut claim_data = ArrayTrait::new();
+            claim_data.append(claim.id.into());
+            claim_data.append(claim.wallet_address.into());
+            claim_data.append(claim.amount.into());
+            claim_data.append(claim.code.into());
+            claim_data.append(beneficiary.into());
+            // Hash the claim data using Poseidon
+            let claim_hash = poseidon_hash_span(claim_data.span());
+            // Placeholder: In the future, verify the proof against claim_hash
+            // For now, just return true to mock successful verification
+            // TODO: Integrate actual STARK proof verification when available on Starknet
+            claim_hash; // suppress unused variable warning
+            proof; // suppress unused variable warning
+            true
+        }
     }
 }
