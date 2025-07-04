@@ -6,3 +6,4 @@ mod IInheritXProfile;
 mod IInheritXSecurity;
 mod IInheritXSwap;
 mod IProxy;
+mod IGuardianAccount;
