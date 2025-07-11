@@ -142,6 +142,24 @@ pub mod InheritX {
         salt: felt252,
     }
 
+    #[derive(Drop, Serde, Hash)]
+    struct VerificationData {
+        user: ContractAddress,
+        timestamp: u64,
+        block_number: u64,
+        salt: felt252,
+    }
+
+    #[derive(Drop, Serde, Hash)]
+    struct ClaimData {
+        beneficiary: ContractAddress,
+        benefactor: ContractAddress,
+        amount: u256,
+        timestamp: u64,
+        block_number: u64,
+        salt: felt252,
+    }
+
     #[constructor]
     fn constructor(ref self: ContractState) {
         self.admin.write(get_caller_address());
@@ -370,9 +388,13 @@ pub mod InheritX {
             beneficiary: ContractAddress,
             personal_message: felt252,
             amount: u256,
-            claim_code: u256,
         ) -> u256 {
             let inheritance_id = self.plans_id.read();
+            let benefactor = get_caller_address();
+
+            // Generate secure Poseidon-based claim code
+            let generated_code = self.generate_claim_code(beneficiary, benefactor, amount);
+
             let new_beneficiary = SimpleBeneficiary {
                 id: inheritance_id,
                 name,
@@ -380,9 +402,9 @@ pub mod InheritX {
                 wallet_address: beneficiary,
                 personal_message,
                 amount,
-                code: claim_code,
+                code: generated_code.into(),
                 claim_status: false,
-                benefactor: get_caller_address(),
+                benefactor: benefactor,
             };
 
             self.funds.write(inheritance_id, new_beneficiary);
@@ -497,7 +519,20 @@ pub mod InheritX {
         fn start_verification(ref self: ContractState, user: ContractAddress) -> felt252 {
             assert(!self.verification_status.read(user), 'Already verified');
 
-            let code = 123456;
+            let verification_data = VerificationData {
+                user: user,
+                timestamp: get_block_timestamp(),
+                block_number: get_block_number(),
+                salt: 0xabc123def456 // Different salt from recovery codes
+            };
+
+            let mut verification_data_array = ArrayTrait::new();
+            verification_data_array.append(verification_data.user.into());
+            verification_data_array.append(verification_data.timestamp.into());
+            verification_data_array.append(verification_data.block_number.into());
+            verification_data_array.append(verification_data.salt);
+
+            let code = poseidon_hash_span(verification_data_array.span());
             let expiry = get_block_timestamp() + 600; // 10 minutes in seconds
 
             self.verification_code.write(user, code);
@@ -664,6 +699,33 @@ pub mod InheritX {
             recovery_data_array.append(recovery_data.salt);
 
             poseidon_hash_span(recovery_data_array.span())
+        }
+
+        fn generate_claim_code(
+            ref self: ContractState,
+            beneficiary: ContractAddress,
+            benefactor: ContractAddress,
+            amount: u256,
+        ) -> felt252 {
+            let claim_data = ClaimData {
+                beneficiary: beneficiary,
+                benefactor: benefactor,
+                amount: amount,
+                timestamp: get_block_timestamp(),
+                block_number: get_block_number(),
+                salt: 0xdef789abc012 // Different salt for claim codes
+            };
+
+            let mut claim_data_array = ArrayTrait::new();
+            claim_data_array.append(claim_data.beneficiary.into());
+            claim_data_array.append(claim_data.benefactor.into());
+            claim_data_array.append(claim_data.amount.low.into());
+            claim_data_array.append(claim_data.amount.high.into());
+            claim_data_array.append(claim_data.timestamp.into());
+            claim_data_array.append(claim_data.block_number.into());
+            claim_data_array.append(claim_data.salt);
+
+            poseidon_hash_span(claim_data_array.span())
         }
 
         fn initiate_recovery(

@@ -90,12 +90,20 @@ mod tests {
         // Ensure dispatcher methods exist
         start_cheat_caller_address(contract_address, caller);
 
-        let verification_status = dispatcher.get_verification_status(20, caller);
-        assert(verification_status == false, 'should be unverified');
+        // Start verification to get a proper Poseidon-based code
+        let verification_code = dispatcher.start_verification(caller);
+
+        // Test with the correct generated code
+        let verification_status = dispatcher.get_verification_status(verification_code, caller);
+        assert!(verification_status == true, "should be verified with correct code");
+
+        // Test with an incorrect code
+        let wrong_verification_status = dispatcher
+            .get_verification_status(verification_code + 1, caller);
+        assert!(wrong_verification_status == false, "should be unverified with wrong code");
     }
 
     #[test]
-    #[should_panic(expected: 'Code expired')]
     fn test_complete_verification() {
         let (dispatcher, contract_address) = setup();
         let caller = contract_address_const::<'address'>();
@@ -103,13 +111,18 @@ mod tests {
         // Ensure dispatcher methods exist
         start_cheat_caller_address(contract_address, caller);
 
-        let verification_status_before = dispatcher.get_verification_status(20, caller);
-        assert(verification_status_before == false, 'should be unverified');
+        // Start verification to get a proper Poseidon-based code
+        let verification_code = dispatcher.start_verification(caller);
 
-        let complete_verification = dispatcher.complete_verififcation(caller, 20);
+        let verification_status_before = dispatcher
+            .get_verification_status(verification_code, caller);
+        assert(verification_status_before == true, 'should be verified');
 
-        let verification_status_after = dispatcher.get_verification_status(20, caller);
-        assert(verification_status_after == true, 'should not be unverified');
+        let complete_verification = dispatcher.complete_verififcation(caller, verification_code);
+
+        // After completing verification, the user should be verified
+        let is_verified = dispatcher.is_verified(caller);
+        assert!(is_verified == true, "should be verified after completion");
     }
 
     #[test]
@@ -860,14 +873,12 @@ mod tests {
         let name: felt252 = 'John';
         let email: felt252 = 'John@yahoo.com';
         let personal_message = 'i love you my son';
-        let claim_code = 2563;
 
         // Ensure the caller is the admin
         cheat_caller_address(contract_address, benefactor, CheatSpan::Indefinite);
 
         // Call create_claim
-        let claim_id = dispatcher
-            .create_claim(name, email, beneficiary, personal_message, 1000, claim_code);
+        let claim_id = dispatcher.create_claim(name, email, beneficiary, personal_message, 1000);
 
         // Validate that the claim ID is correctly incremented
         assert(claim_id == 0, 'claim ID should start from 0');
@@ -877,8 +888,11 @@ mod tests {
         assert(claim.id == claim_id, 'claim ID mismatch');
         assert(claim.name == name, 'claim title mismatch');
         assert(claim.personal_message == personal_message, 'claim description mismatch');
-        assert(claim.code == claim_code, 'claim price mismatch');
-        assert(claim.wallet_address == beneficiary, 'cbenificiary address mismatch');
+
+        // Verify the generated Poseidon code
+        assert!(claim.code != 0, "Generated code should not be zero");
+
+        assert(claim.wallet_address == beneficiary, 'beneficiary address mismatch');
         assert(claim.email == email, 'claim email mismatch');
         assert(claim.benefactor == benefactor, 'benefactor address mismatch');
     }
@@ -893,20 +907,24 @@ mod tests {
         let name: felt252 = 'John';
         let email: felt252 = 'John@yahoo.com';
         let personal_message = 'i love you my son';
-        let claim_code = 2563;
 
         // Ensure the caller is the admin
         cheat_caller_address(contract_address, benefactor, CheatSpan::Indefinite);
 
         // Call create_claim
-        let claim_id = dispatcher
-            .create_claim(name, email, beneficiary, personal_message, 1000, claim_code);
+        let claim_id = dispatcher.create_claim(name, email, beneficiary, personal_message, 1000);
 
         // Validate that the claim ID is correctly incremented
         assert(claim_id == 0, 'claim ID should start from 0');
+
+        // Get the actual generated claim code
+        let claim = dispatcher.retrieve_claim(claim_id);
+        let generated_code = claim.code;
+
         cheat_caller_address(contract_address, beneficiary, CheatSpan::Indefinite);
 
-        let success = dispatcher.collect_claim(0, beneficiary, 2563);
+        // Use the actual generated code to collect the claim
+        let success = dispatcher.collect_claim(0, beneficiary, generated_code);
 
         assert(success, 'Claim unsuccessful');
     }
@@ -923,20 +941,24 @@ mod tests {
         let name: felt252 = 'John';
         let email: felt252 = 'John@yahoo.com';
         let personal_message = 'i love you my son';
-        let claim_code = 2563;
 
         // Ensure the caller is the admin
         cheat_caller_address(contract_address, benefactor, CheatSpan::Indefinite);
 
         // Call create_claim
-        let claim_id = dispatcher
-            .create_claim(name, email, beneficiary, personal_message, 1000, claim_code);
+        let claim_id = dispatcher.create_claim(name, email, beneficiary, personal_message, 1000);
 
         // Validate that the claim ID is correctly incremented
         assert(claim_id == 0, 'claim ID should start from 0');
+
+        // Get the actual generated claim code
+        let claim = dispatcher.retrieve_claim(claim_id);
+        let generated_code = claim.code;
+
         cheat_caller_address(contract_address, beneficiary, CheatSpan::Indefinite);
 
-        let success = dispatcher.collect_claim(0, malicious, 2563);
+        // Try to collect with wrong address but correct code - should fail with "Not your claim"
+        let success = dispatcher.collect_claim(0, malicious, generated_code);
 
         assert(success, 'Claim unsuccessful');
     }
@@ -947,26 +969,30 @@ mod tests {
         let (dispatcher, contract_address) = setup();
         let benefactor: ContractAddress = contract_address_const::<'benefactor'>();
         let beneficiary: ContractAddress = contract_address_const::<'beneficiary'>();
-        let malicious: ContractAddress = contract_address_const::<'malicious'>();
 
         // Test input values
         let name: felt252 = 'John';
         let email: felt252 = 'John@yahoo.com';
         let personal_message = 'i love you my son';
-        let claim_code = 2563;
 
         // Ensure the caller is the admin
         cheat_caller_address(contract_address, benefactor, CheatSpan::Indefinite);
 
         // Call create_claim
-        let claim_id = dispatcher
-            .create_claim(name, email, beneficiary, personal_message, 1000, claim_code);
+        let claim_id = dispatcher.create_claim(name, email, beneficiary, personal_message, 1000);
 
         // Validate that the claim ID is correctly incremented
         assert(claim_id == 0, 'claim ID should start from 0');
+
+        // Get the actual generated claim code
+        let claim = dispatcher.retrieve_claim(claim_id);
+        let generated_code = claim.code;
+
         cheat_caller_address(contract_address, beneficiary, CheatSpan::Indefinite);
 
-        let success = dispatcher.collect_claim(0, beneficiary, 63);
+        // Try to collect with wrong code - should fail with "Invalid claim code"
+        let wrong_code = generated_code + 999; // Definitely wrong code
+        let success = dispatcher.collect_claim(0, beneficiary, wrong_code);
 
         assert(success, 'Claim unsuccessful');
     }
@@ -977,30 +1003,33 @@ mod tests {
         let (dispatcher, contract_address) = setup();
         let benefactor: ContractAddress = contract_address_const::<'benefactor'>();
         let beneficiary: ContractAddress = contract_address_const::<'beneficiary'>();
-        let malicious: ContractAddress = contract_address_const::<'malicious'>();
 
         // Test input values
         let name: felt252 = 'John';
         let email: felt252 = 'John@yahoo.com';
         let personal_message = 'i love you my son';
-        let claim_code = 2563;
 
         // Ensure the caller is the admin
         cheat_caller_address(contract_address, benefactor, CheatSpan::Indefinite);
 
         // Call create_claim
-        let claim_id = dispatcher
-            .create_claim(name, email, beneficiary, personal_message, 1000, claim_code);
+        let claim_id = dispatcher.create_claim(name, email, beneficiary, personal_message, 1000);
 
         // Validate that the claim ID is correctly incremented
         assert(claim_id == 0, 'claim ID should start from 0');
+
+        // Get the actual generated claim code
+        let claim = dispatcher.retrieve_claim(claim_id);
+        let generated_code = claim.code;
+
         cheat_caller_address(contract_address, beneficiary, CheatSpan::Indefinite);
 
-        let success = dispatcher.collect_claim(0, beneficiary, 2563);
-
+        // First collection should succeed
+        let success = dispatcher.collect_claim(0, beneficiary, generated_code);
         assert(success, 'Claim unsuccessful');
 
-        let success2 = dispatcher.collect_claim(0, beneficiary, 2563);
+        // Second collection with same code should fail with "You have already made a claim"
+        let success2 = dispatcher.collect_claim(0, beneficiary, generated_code);
     }
 
     #[test]
@@ -1259,6 +1288,101 @@ mod tests {
         assert(!is_still_valid, 'Code expires after use');
 
         stop_cheat_block_timestamp(contract_address);
+    }
+
+    // Poseidon Claim Verification Tests
+    #[test]
+    fn test_generate_claim_code() {
+        // Setup
+        let (dispatcher, contract_address) = setup();
+        let beneficiary = contract_address_const::<'beneficiary'>();
+        let benefactor = contract_address_const::<'benefactor'>();
+        let amount = 1000_u256;
+
+        // Set specific block timestamp for deterministic testing
+        let test_timestamp = 1648000000_u64;
+        start_cheat_block_timestamp(contract_address, test_timestamp);
+
+        // Generate claim code
+        start_cheat_caller_address(contract_address, benefactor);
+        let claim_code = dispatcher.generate_claim_code(beneficiary, benefactor, amount);
+
+        // Verify code is not zero (indicating successful Poseidon hash generation)
+        assert(claim_code != 0, 'Claim code should not be zero');
+
+        // Generate code again with different parameters - should be different
+        let different_claim_code = dispatcher
+            .generate_claim_code(beneficiary, benefactor, amount + 100);
+        assert!(claim_code != different_claim_code, "Different params should give different codes");
+
+        // Generate code with same parameters but different timestamp - should be different
+        start_cheat_block_timestamp(contract_address, test_timestamp + 100);
+        let new_timestamp_code = dispatcher.generate_claim_code(beneficiary, benefactor, amount);
+        assert!(
+            claim_code != new_timestamp_code, "Different timestamp should give different codes",
+        );
+
+        stop_cheat_block_timestamp(contract_address);
+    }
+
+    #[test]
+    fn test_create_claim_uses_poseidon_code() {
+        // Setup
+        let (dispatcher, contract_address) = setup();
+        let benefactor = contract_address_const::<'benefactor'>();
+        let beneficiary = contract_address_const::<'beneficiary'>();
+
+        // Test input values
+        let name: felt252 = 'Alice';
+        let email: felt252 = 'alice@test.com';
+        let personal_message = 'For my daughter';
+        let amount = 5000_u256;
+        // Set caller context
+        start_cheat_caller_address(contract_address, benefactor);
+
+        // Create claim - the function will generate a secure Poseidon-based claim code
+        let claim_id = dispatcher.create_claim(name, email, beneficiary, personal_message, amount);
+
+        // Retrieve the claim to check the generated code
+        let claim = dispatcher.retrieve_claim(claim_id);
+
+        // Verify the generated Poseidon code
+        assert!(claim.code != 0, "Generated code should not be zero");
+
+        // Verify other claim details
+        assert(claim.name == name, 'Name mismatch');
+        assert(claim.email == email, 'Email mismatch');
+        assert(claim.wallet_address == beneficiary, 'Beneficiary mismatch');
+        assert(claim.amount == amount, 'Amount mismatch');
+        assert(claim.benefactor == benefactor, 'Benefactor mismatch');
+    }
+
+    #[test]
+    fn test_collect_claim_with_poseidon_code() {
+        // Setup
+        let (dispatcher, contract_address) = setup();
+        let benefactor = contract_address_const::<'benefactor'>();
+        let beneficiary = contract_address_const::<'beneficiary'>();
+
+        // Create claim
+        start_cheat_caller_address(contract_address, benefactor);
+        let claim_id = dispatcher
+            .create_claim('Bob', 'bob@test.com', beneficiary, 'For my son', 3000_u256);
+
+        // Get the actual generated claim code
+        let claim = dispatcher.retrieve_claim(claim_id);
+        let generated_code = claim.code;
+
+        // Switch to beneficiary to collect claim
+        start_cheat_caller_address(contract_address, beneficiary);
+
+        // Should succeed with the correct generated code
+        let success = dispatcher.collect_claim(claim_id, beneficiary, generated_code);
+        assert(success, 'Claim collection should succeed');
+
+        // Verify claim status is updated
+        let updated_claim = dispatcher.retrieve_claim(claim_id);
+        assert!(updated_claim.claim_status == true, "Claim should be marked as collected");
     }
 
 

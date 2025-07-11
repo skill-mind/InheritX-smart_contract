@@ -28,7 +28,6 @@ pub trait IInheritX<TContractState> {
         beneficiary: ContractAddress,
         personal_message: felt252,
         amount: u256,
-        claim_code: u256,
     ) -> u256;
 
     fn create_profile(
@@ -112,6 +111,13 @@ pub trait IInheritX<TContractState> {
     fn get_total_plans(self: @TContractState) -> u256;
 
     fn generate_recovery_code(ref self: TContractState, user: ContractAddress) -> felt252;
+
+    fn generate_claim_code(
+        ref self: TContractState,
+        beneficiary: ContractAddress,
+        benefactor: ContractAddress,
+        amount: u256,
+    ) -> felt252;
 
     fn initiate_recovery(
         ref self: TContractState, user: ContractAddress, recovery_method: felt252,
