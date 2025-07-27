@@ -87,6 +87,8 @@ pub mod InheritX {
         user_wallets: Map<ContractAddress, Map<u256, Wallet>>,
         user_primary_wallet: Map<ContractAddress, ContractAddress>,
         total_user_wallets: Map<ContractAddress, u256>,
+        // KYC details storage for IPFS hashes (CID)
+        kyc_details_uri: Map<ContractAddress, ByteArray>,
     }
 
     // Response-only struct (not stored)
@@ -120,12 +122,36 @@ pub mod InheritX {
         user: ContractAddress,
     }
 
+    #[derive(Drop, starknet::Event)]
+    pub struct KYCDetailsStored {
+        pub user: ContractAddress,
+        pub ipfs_hash: ByteArray,
+        pub timestamp: u64,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct KYCDetailsUpdated {
+        pub user: ContractAddress,
+        pub old_ipfs_hash: ByteArray,
+        pub new_ipfs_hash: ByteArray,
+        pub timestamp: u64,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct KYCDetailsDeleted {
+        pub user: ContractAddress,
+        pub timestamp: u64,
+    }
+
     #[event]
     #[derive(Drop, starknet::Event)]
     pub enum Event {
         ActivityRecordEvent: ActivityRecordEvent,
         BeneficiaryAdded: BeneficiaryAdded,
         NotificationUpdated: NotificationUpdated,
+        KYCDetailsStored: KYCDetailsStored,
+        KYCDetailsUpdated: KYCDetailsUpdated,
+        KYCDetailsDeleted: KYCDetailsDeleted,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -1146,6 +1172,107 @@ pub mod InheritX {
             if beneficiaries_count == 0 {
                 return false;
             }
+            true
+        }
+
+
+        fn store_kyc_details(ref self: ContractState, ipfs_hash: ByteArray) -> bool {
+            let caller = get_caller_address();
+
+            // Ensure the user doesn't already have KYC details stored
+            let existing_hash = self.kyc_details_uri.entry(caller).read();
+            assert(existing_hash.len() == 0, 'KYC details already exist');
+
+            assert(ipfs_hash.len() > 0, 'IPFS hash cannot be empty');
+
+            self.kyc_details_uri.entry(caller).write(ipfs_hash.clone());
+
+            self
+                .record_user_activity(
+                    caller, ActivityType::ProfileUpdate, 'KYC details stored', '', '',
+                );
+
+            self
+                .emit(
+                    Event::KYCDetailsStored(
+                        KYCDetailsStored {
+                            user: caller, ipfs_hash: ipfs_hash, timestamp: get_block_timestamp(),
+                        },
+                    ),
+                );
+
+            true
+        }
+
+        fn update_kyc_details(ref self: ContractState, new_ipfs_hash: ByteArray) -> ByteArray {
+            let caller = get_caller_address();
+
+            // Get existing KYC details
+            let old_hash = self.kyc_details_uri.entry(caller).read();
+            assert(old_hash.len() > 0, 'No existing KYC details');
+
+            assert(new_ipfs_hash.len() > 0, 'IPFS hash cannot be empty');
+
+            assert(old_hash != new_ipfs_hash, 'New hash must be different');
+
+            self.kyc_details_uri.entry(caller).write(new_ipfs_hash.clone());
+
+            self
+                .record_user_activity(
+                    caller, ActivityType::ProfileUpdate, 'KYC details updated', '', '',
+                );
+
+            self
+                .emit(
+                    Event::KYCDetailsUpdated(
+                        KYCDetailsUpdated {
+                            user: caller,
+                            old_ipfs_hash: old_hash,
+                            new_ipfs_hash: new_ipfs_hash.clone(),
+                            timestamp: get_block_timestamp(),
+                        },
+                    ),
+                );
+
+            new_ipfs_hash
+        }
+
+        fn get_kyc_details(self: @ContractState, user: ContractAddress) -> ByteArray {
+            let caller = get_caller_address();
+
+            // Users can only access their own KYC details unless they're admin
+            let admin = self.admin.read();
+            assert(caller == user || caller == admin, 'Unauthorized KYC access');
+
+            self.kyc_details_uri.entry(user).read()
+        }
+
+        fn has_kyc_details(self: @ContractState, user: ContractAddress) -> bool {
+            let kyc_hash = self.kyc_details_uri.entry(user).read();
+            kyc_hash.len() > 0
+        }
+
+        fn delete_kyc_details(ref self: ContractState) -> bool {
+            let caller = get_caller_address();
+
+            let existing_hash = self.kyc_details_uri.entry(caller).read();
+            assert(existing_hash.len() > 0, 'No KYC details to delete');
+
+            let empty_hash: ByteArray = "";
+            self.kyc_details_uri.entry(caller).write(empty_hash);
+
+            self
+                .record_user_activity(
+                    caller, ActivityType::SecurityChange, 'KYC details deleted', '', '',
+                );
+
+            self
+                .emit(
+                    Event::KYCDetailsDeleted(
+                        KYCDetailsDeleted { user: caller, timestamp: get_block_timestamp() },
+                    ),
+                );
+
             true
         }
     }
