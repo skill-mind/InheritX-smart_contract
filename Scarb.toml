@@ -10,7 +10,7 @@ starknet = "2.10.1"
 openzeppelin = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", branch = "main" }
 
 [dev-dependencies]
-snforge_std = "0.39.0"
+snforge_std = "0.44.0"
 assert_macros = "2.10.1"
 
 [[target.starknet-contract]]
@@ -41,7 +41,7 @@ allow-prebuilt-plugins = ["snforge_std"]
 
 # [[tool.snforge.fork]]
 # name = "SOME_THIRD_NAME"
-# url = "http://your.third.rpc.url"
+# url = "http://your.third.rpc.url"                         
 # block_id.hash = "0x123"                                    # Block to fork from (block hash)
 
 # [profile.dev.cairo]                                        # Configure Cairo compiler

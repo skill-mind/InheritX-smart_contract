@@ -1,8 +1,7 @@
 use starknet::ContractAddress;
 use crate::types::{
-    ActivityRecord, ActivityType, AssetAllocation, InheritancePlan, NotificationSettings,
-    NotificationStruct, PlanOverview, PlanSection, SecuritySettings, SimpleBeneficiary, UserProfile,
-    Wallet,
+    ActivityRecord, ActivityType, AssetAllocation, IPFSData, IPFSDataType, InheritancePlan,
+    NotificationStruct, PlanOverview, PlanSection, SimpleBeneficiary, UserProfile, Wallet,
 };
 
 #[starknet::interface]
@@ -30,13 +29,7 @@ pub trait IInheritX<TContractState> {
         amount: u256,
     ) -> u256;
 
-    fn create_profile(
-        ref self: TContractState,
-        username: felt252,
-        email: felt252,
-        full_name: felt252,
-        profile_image: felt252,
-    ) -> bool;
+    fn create_profile(ref self: TContractState, username: felt252, email: felt252) -> bool;
 
     fn collect_claim(
         ref self: TContractState,
@@ -146,19 +139,11 @@ pub trait IInheritX<TContractState> {
 
     fn delete_user_profile(ref self: TContractState, address: ContractAddress) -> bool;
 
-    fn update_user_profile(
-        ref self: TContractState,
-        username: felt252,
-        email: felt252,
-        full_name: felt252,
-        profile_image: felt252,
-        notification_settings: NotificationSettings,
-        security_settings: SecuritySettings,
-    ) -> bool;
+    fn update_user_profile(ref self: TContractState, username: felt252, email: felt252) -> bool;
 
     fn get_user_profile(self: @TContractState, user: ContractAddress) -> UserProfile;
 
-    fn update_security_settings(ref self: TContractState, new_settings: SecuritySettings) -> bool;
+    fn update_security_settings(ref self: TContractState, new_settings: felt252) -> bool;
 
     fn add_wallet(ref self: TContractState, wallet: ContractAddress, wallet_type: felt252) -> bool;
 
@@ -179,4 +164,24 @@ pub trait IInheritX<TContractState> {
     fn plan_has_assets(self: @TContractState, plan_id: u256) -> bool;
 
     fn check_beneficiary_plan(self: @TContractState, plan_id: u256) -> bool;
+
+    // New IPFS/Pinata integration functions
+    fn update_user_ipfs_data(
+        ref self: TContractState,
+        user: ContractAddress,
+        data_type: IPFSDataType,
+        ipfs_hash: felt252,
+    );
+
+    fn update_plan_ipfs_data(
+        ref self: TContractState, plan_id: u256, data_type: IPFSDataType, ipfs_hash: felt252,
+    );
+
+    fn get_user_ipfs_data(
+        self: @TContractState, user: ContractAddress, data_type: IPFSDataType,
+    ) -> IPFSData;
+
+    fn get_plan_ipfs_data(
+        self: @TContractState, plan_id: u256, data_type: IPFSDataType,
+    ) -> IPFSData;
 }

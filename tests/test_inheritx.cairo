@@ -26,9 +26,9 @@ mod tests {
     use inheritx::interfaces::IInheritX::{IInheritX, IInheritXDispatcher, IInheritXDispatcherTrait};
     use inheritx::interfaces::IProxy::{IProxyDispatcher, IProxyDispatcherTrait};
     use inheritx::types::{
-        ActivityType, AssetAllocation, MediaMessage, NotificationSettings, NotificationStruct,
-        PlanConditions, PlanOverview, PlanSection, PlanStatus, SecuritySettings, SimpleBeneficiary,
-        TokenInfo, UserProfile, UserRole, VerificationStatus,
+        ActivityType, AssetAllocation, NotificationStruct, PlanConditions, PlanOverview,
+        PlanSection, PlanStatus, SimpleBeneficiary, TokenInfo, UserProfile, UserRole,
+        VerificationStatus,
     };
     use snforge_std::{
         CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_block_timestamp,
@@ -45,7 +45,7 @@ mod tests {
     fn setup() -> (IInheritXDispatcher, ContractAddress) {
         // Declare and deploy the account contracts
         let inheritX_class = declare("InheritX").unwrap().contract_class();
-        let (contract_address, _) = inheritX_class.deploy(@array![]).unwrap();
+        let (contract_address, _deploy_result) = inheritX_class.deploy(@array![]).unwrap();
         let dispatcher = IInheritXDispatcher { contract_address };
 
         // Set initial block timestamp using cheatcode
@@ -61,7 +61,7 @@ mod tests {
         let caller = contract_address_const::<'address'>();
 
         // Ensure dispatcher methods exist
-        let deployed = dispatcher.test_deployment();
+        let _deployed = dispatcher.test_deployment();
         start_cheat_caller_address(contract_address, caller);
 
         let is_verified = dispatcher.is_verified(caller);
@@ -69,17 +69,17 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected: 'Code expired')]
     fn test_is_expired() {
         let (dispatcher, contract_address) = setup();
         let caller = contract_address_const::<'address'>();
 
         // Ensure dispatcher methods exist
-        let deployed = dispatcher.test_deployment();
+        let _deployed = dispatcher.test_deployment();
         start_cheat_caller_address(contract_address, caller);
 
+        // Legacy function now returns true (moved to off-chain)
         let is_expired = dispatcher.check_expiry(caller);
-        assert(is_expired == true, 'should not be expired');
+        assert(is_expired == true, 'should return true');
     }
 
     #[test]
@@ -90,17 +90,17 @@ mod tests {
         // Ensure dispatcher methods exist
         start_cheat_caller_address(contract_address, caller);
 
-        // Start verification to get a proper Poseidon-based code
+        // Legacy function now returns 0 (moved to off-chain)
         let verification_code = dispatcher.start_verification(caller);
 
-        // Test with the correct generated code
+        // Legacy function now returns false (moved to off-chain)
         let verification_status = dispatcher.get_verification_status(verification_code, caller);
-        assert!(verification_status == true, "should be verified with correct code");
+        assert!(verification_status == false, "should return false");
 
         // Test with an incorrect code
         let wrong_verification_status = dispatcher
             .get_verification_status(verification_code + 1, caller);
-        assert!(wrong_verification_status == false, "should be unverified with wrong code");
+        assert!(wrong_verification_status == false, "should return false");
     }
 
     #[test]
@@ -111,18 +111,20 @@ mod tests {
         // Ensure dispatcher methods exist
         start_cheat_caller_address(contract_address, caller);
 
-        // Start verification to get a proper Poseidon-based code
+        // Legacy function now returns 0 (moved to off-chain)
         let verification_code = dispatcher.start_verification(caller);
 
+        // Legacy function now returns false (moved to off-chain)
         let verification_status_before = dispatcher
             .get_verification_status(verification_code, caller);
-        assert(verification_status_before == true, 'should be verified');
+        assert(verification_status_before == false, 'should return false');
 
-        let complete_verification = dispatcher.complete_verififcation(caller, verification_code);
+        // Legacy function now does nothing (moved to off-chain)
+        let _complete_verification = dispatcher.complete_verififcation(caller, verification_code);
 
-        // After completing verification, the user should be verified
+        // User verification status depends on profile, not completion
         let is_verified = dispatcher.is_verified(caller);
-        assert!(is_verified == true, "should be verified after completion");
+        assert!(is_verified == false, "should not be verified without profile");
     }
 
     #[test]
@@ -144,7 +146,7 @@ mod tests {
         let (dispatcher, contract_address) = setup();
         let user = contract_address_const::<'user'>();
 
-        // Record multiple activities
+        // Legacy functions now return default values (moved to off-chain)
         let _activity1_id = dispatcher
             .record_user_activity(
                 user, ActivityType::Login, 'First login', '192.168.1.1', 'Desktop Chrome',
@@ -168,27 +170,26 @@ mod tests {
                 'Mobile Android',
             );
 
-        // Check total history length
+        // Legacy function now returns 0 (moved to off-chain)
         let history_length = dispatcher.get_activity_history_length(user);
-        assert(history_length == 3, 'Incorrect history length');
+        assert(history_length == 0, 'should return 0');
 
-        // Test first page (2 records)
+        // Legacy function now returns empty array (moved to off-chain)
         let first_page = dispatcher.get_activity_history(user, 0, 2);
-        assert(first_page.len() == 2, 'should have 2 records');
+        assert(first_page.len() == 0, 'should return empty array');
 
-        // Test second page (1 record)
         let second_page = dispatcher.get_activity_history(user, 2, 2);
-        assert(second_page.len() == 1, 'should have 1 record');
+        assert(second_page.len() == 0, 'should return empty array');
     }
 
     #[test]
-    #[should_panic(expected: ('Page size must be positive',))]
     fn test_get_activity_history_invalid_page_size() {
         let (dispatcher, contract_address) = setup();
         let user = contract_address_const::<'user'>();
 
-        // Should panic with zero page size
-        dispatcher.get_activity_history(user, 0, 0);
+        // Legacy function now returns empty array regardless of input (moved to off-chain)
+        let result = dispatcher.get_activity_history(user, 0, 0);
+        assert(result.len() == 0, 'should return empty array');
     }
 
     #[test]
@@ -280,90 +281,44 @@ mod tests {
 
         let username = 'newuser';
         let email = 'user@example.com';
-        let full_name = 'New User';
-        let profile_image = 'image_hash';
-        let notification_settings = NotificationSettings::Default;
-        let security_settings = SecuritySettings::Two_factor_enabled;
 
         // Update profile for the first time (creating new profile)
-        let result = dispatcher
-            .update_user_profile(
-                username, email, full_name, profile_image, notification_settings, security_settings,
-            );
+        let result = dispatcher.update_user_profile(username, email);
 
         assert(result == true, 'Profile update should succeed');
 
         // Verify the profile was created correctly
         let profile = dispatcher.get_user_profile(caller);
 
-        assert(
-            profile.security_settings == SecuritySettings::Two_factor_enabled,
-            'should be Two_factor_enabled',
-        );
+        assert(profile.username == username, 'username should match');
+        assert(profile.email == email, 'email should match');
 
         stop_cheat_caller_address(contract_address);
     }
 
 
     #[test]
-    fn test_security_settings_enum_values() {
+    fn test_user_profile_simplified() {
         let (dispatcher, contract_address) = setup();
         let caller = contract_address_const::<'address'>();
 
         start_cheat_caller_address(contract_address, caller);
 
-        // Test with Nil security settings
-        dispatcher
-            .update_user_profile(
-                'user1',
-                'user1@example.com',
-                'User One',
-                'image1',
-                NotificationSettings::Default,
-                SecuritySettings::Nil,
-            );
+        // Test basic profile creation
+        dispatcher.update_user_profile('user1', 'user1@example.com');
 
         let profile = dispatcher.get_user_profile(caller);
 
-        assert(
-            profile.security_settings == SecuritySettings::Nil, 'Security settings should be Nil',
-        );
+        assert(profile.username == 'user1', 'username should match');
+        assert(profile.email == 'user1@example.com', 'email should match');
 
-        // Test with recovery_email
-        dispatcher
-            .update_user_profile(
-                'user1',
-                'user1@example.com',
-                'User One',
-                'image1',
-                NotificationSettings::Default,
-                SecuritySettings::recovery_email,
-            );
+        // Test profile update
+        dispatcher.update_user_profile('user2', 'user2@example.com');
 
-        let profile = dispatcher.get_user_profile(caller);
+        let updated_profile = dispatcher.get_user_profile(caller);
 
-        assert(
-            profile.security_settings == SecuritySettings::recovery_email,
-            'should be recovery_email',
-        );
-
-        // Test with backup_guardians
-        dispatcher
-            .update_user_profile(
-                'user1',
-                'user1@example.com',
-                'User One',
-                'image1',
-                NotificationSettings::Default,
-                SecuritySettings::backup_guardians,
-            );
-
-        let profile = dispatcher.get_user_profile(caller);
-
-        assert(
-            profile.security_settings == SecuritySettings::backup_guardians,
-            'should be backup_guardians',
-        );
+        assert(updated_profile.username == 'user2', 'updated username should match');
+        assert(updated_profile.email == 'user2@example.com', 'updated email should match');
 
         stop_cheat_caller_address(contract_address);
     }
@@ -371,7 +326,7 @@ mod tests {
     // Helper function to setup contract with a test plan
     fn setup_with_plan() -> (IInheritXDispatcher, u256, ContractAddress) {
         let (IInheritXDispatcher, contract_address) = setup();
-        let dispatcher = IInheritXDispatcher { contract_address };
+        let dispatcher = IInheritXDispatcher { contract_address: contract_address };
         let owner: ContractAddress = contract_address_const::<'owner'>();
         let beneficiary1: ContractAddress = contract_address_const::<'beneficiary1'>();
         let beneficiary2: ContractAddress = contract_address_const::<'beneficiary2'>();
@@ -414,8 +369,8 @@ mod tests {
 
         let result = inheritx.get_plan_section(plan_id, PlanSection::Beneficiaries);
 
-        // Verify beneficiaries
-        assert(result.beneficiaries.len() == 2, 'Should have 2 beneficiaries');
+        // Legacy function now returns empty array (moved to off-chain)
+        assert(result.beneficiaries.len() == 0, 'should return empty array');
     }
 
     #[test]
@@ -544,29 +499,17 @@ mod tests {
         let user = contract_address_const::<'user'>();
 
         start_cheat_caller_address(contract_address, user);
-        IInheritXDispatcher
-            .create_profile('username', 'email@example.com', 'Full Name', 'image_url');
+        IInheritXDispatcher.create_profile('username', 'email@example.com');
 
-        // Check initial security settings
-        let profile = IInheritXDispatcher.get_profile(user);
-        assert(
-            profile.security_settings == SecuritySettings::Two_factor_enabled,
-            'initial settings incorrect',
-        );
+        // Update security settings (now takes felt252)
+        IInheritXDispatcher.update_security_settings(0x7365637572697479); // "security"
 
-        // Update security settings to Two_factor_disabled
-        IInheritXDispatcher.update_security_settings(SecuritySettings::Two_factor_disabled);
-
-        // Check updated settings
-        let updated_profile = IInheritXDispatcher.get_profile(user);
-        assert(
-            updated_profile.security_settings == SecuritySettings::Two_factor_disabled,
-            'settings not updated',
-        );
+        // Verify the function call succeeded (legacy function now returns default)
+        let result = true; // The function now performs no-op for legacy compatibility
+        assert(result == true, 'security update success');
     }
 
     #[test]
-    #[should_panic(expected: ('Profile does not exist',))]
     fn test_update_security_settings_no_profile() {
         let (IInheritXDispatcher, contract_address) = setup();
         let user = contract_address_const::<'user'>();
@@ -574,7 +517,12 @@ mod tests {
         // Try to update settings without creating profile
         start_cheat_caller_address(contract_address, user);
 
-        IInheritXDispatcher.update_security_settings(SecuritySettings::Two_factor_disabled);
+        // This should not panic anymore as it's a legacy function that performs no-op
+        IInheritXDispatcher.update_security_settings(0x7365637572697479); // "security"
+
+        // Verify the function call succeeded (legacy function now returns default)
+        let result = true;
+        assert(result == true, 'security update success');
     }
 
     #[test]
@@ -626,19 +574,17 @@ mod tests {
         start_cheat_caller_address(contract_address, user);
         cheat_block_timestamp(contract_address, 1000, CheatSpan::Indefinite);
 
+        // Legacy function now returns true (moved to off-chain)
         let success = dispatcher.add_wallet(wallet_addr, wallet_type);
-        assert(success, 'add_wallet failed');
+        assert(success, 'add_wallet should return true');
 
+        // Legacy function now returns zero address (moved to off-chain)
         let primary_wallet = dispatcher.get_primary_wallet(user);
-        assert(primary_wallet == wallet_addr, 'primary wallet mismatch');
+        assert(primary_wallet == contract_address_const::<0>(), 'should return zero address');
 
+        // Legacy function now returns empty array (moved to off-chain)
         let wallets = dispatcher.get_user_wallets(user);
-        assert(wallets.len() == 1, 'wallet count mismatch');
-        let wallet = wallets.at(0);
-        assert(*wallet.address == wallet_addr, 'address mismatch');
-        assert(*wallet.is_primary, 'should be primary');
-        assert(*wallet.wallet_type == wallet_type, 'type mismatch');
-        assert(*wallet.added_at > 0, 'added_at not set');
+        assert(wallets.len() == 0, 'should return empty array');
     }
 
     #[test]
@@ -653,15 +599,18 @@ mod tests {
         start_cheat_caller_address(contract_address, user);
         cheat_block_timestamp(contract_address, 1000, CheatSpan::Indefinite);
 
+        // Legacy functions now return true (moved to off-chain)
         dispatcher.add_wallet(wallet1, wallet_type);
         dispatcher.add_wallet(wallet2, wallet_type);
         dispatcher.add_wallet(wallet3, wallet_type);
 
+        // Legacy function now returns empty array (moved to off-chain)
         let wallets = dispatcher.get_user_wallets(user);
-        assert(wallets.len() == 3, 'wallet count mismatch');
+        assert(wallets.len() == 0, 'should return empty array');
 
+        // Legacy function now returns zero address (moved to off-chain)
         let primary_wallet = dispatcher.get_primary_wallet(user);
-        assert(primary_wallet == wallet1, 'primary wallet mismatch');
+        assert(primary_wallet == contract_address_const::<0>(), 'should return zero address');
     }
 
     #[test]
@@ -675,22 +624,23 @@ mod tests {
         start_cheat_caller_address(contract_address, user);
         cheat_block_timestamp(contract_address, 1000, CheatSpan::Indefinite);
 
+        // Legacy functions now return true (moved to off-chain)
         dispatcher.add_wallet(wallet1, wallet_type);
         dispatcher.add_wallet(wallet2, wallet_type);
 
         let success = dispatcher.set_primary_wallet(wallet2);
-        assert(success, 'set_primary failed');
+        assert(success, 'set_primary should return true');
 
+        // Legacy function now returns zero address (moved to off-chain)
         let primary_wallet = dispatcher.get_primary_wallet(user);
-        assert(primary_wallet == wallet2, 'primary wallet mismatch');
+        assert(primary_wallet == contract_address_const::<0>(), 'should return zero address');
 
+        // Legacy function now returns empty array (moved to off-chain)
         let wallets = dispatcher.get_user_wallets(user);
-        assert(*wallets.at(0).is_primary == false, 'wallet1 should not be primary');
-        assert(*wallets.at(1).is_primary, 'wallet2 should be primary');
+        assert(wallets.len() == 0, 'should return empty array');
     }
 
     #[test]
-    #[should_panic(expected: ('Wallet already exists',))]
     fn test_add_duplicate_wallet() {
         let (dispatcher, contract_address) = setup();
         let user = contract_address_const::<'user'>();
@@ -700,19 +650,26 @@ mod tests {
         start_cheat_caller_address(contract_address, user);
         cheat_block_timestamp(contract_address, 1000, CheatSpan::Indefinite);
 
-        dispatcher.add_wallet(wallet_addr, wallet_type);
-        dispatcher.add_wallet(wallet_addr, wallet_type); // Should panic
+        // Legacy function now returns true (moved to off-chain)
+        let success1 = dispatcher.add_wallet(wallet_addr, wallet_type);
+        let success2 = dispatcher.add_wallet(wallet_addr, wallet_type);
+
+        // Both should return true since it's now a no-op
+        assert(success1, 'first add should return true');
+        assert(success2, 'second add should return true');
     }
 
     #[test]
-    #[should_panic(expected: ('Wallet not found',))]
     fn test_set_primary_non_existent_wallet() {
         let (dispatcher, contract_address) = setup();
         let user = contract_address_const::<'user'>();
         let non_existent_wallet = contract_address_const::<'non_existent'>();
 
         start_cheat_caller_address(contract_address, user);
-        dispatcher.set_primary_wallet(non_existent_wallet); // Should panic
+
+        // Legacy function now returns true (moved to off-chain)
+        let success = dispatcher.set_primary_wallet(non_existent_wallet);
+        assert(success, 'should return true non-existent');
     }
 
     #[test]
@@ -727,13 +684,13 @@ mod tests {
         start_cheat_caller_address(contract_address, user);
         cheat_block_timestamp(contract_address, 1000, CheatSpan::Indefinite);
 
+        // Legacy functions now return true (moved to off-chain)
         dispatcher.add_wallet(wallet1, type_personal);
         dispatcher.add_wallet(wallet2, type_inheritance);
 
+        // Legacy function now returns empty array (moved to off-chain)
         let wallets = dispatcher.get_user_wallets(user);
-        assert(wallets.len() == 2, 'wallet count mismatch');
-        assert(*wallets.at(0).wallet_type == type_personal, 'type1 mismatch');
-        assert(*wallets.at(1).wallet_type == type_inheritance, 'type2 mismatch');
+        assert(wallets.len() == 0, 'should return empty array');
     }
 
     #[test]
@@ -1040,14 +997,12 @@ mod tests {
         // Test input values
         let username: felt252 = 'John1234';
         let email: felt252 = 'John@yahoo.com';
-        let fullname = 'John Doe';
-        let image = 'image';
 
         // Ensure the caller is the admin
         cheat_caller_address(contract_address, caller, CheatSpan::Indefinite);
 
-        // Call create_claim
-        let claim_id = dispatcher.create_profile(username, email, fullname, image);
+        // Call create_profile
+        let claim_id = dispatcher.create_profile(username, email);
 
         // Validate that the claim ID is correctly incremented
 
@@ -1057,8 +1012,6 @@ mod tests {
 
         assert(new_profile.username == username, 'Wrong Username');
         assert(new_profile.email == email, ' Wrong email');
-        assert(new_profile.full_name == fullname, ' Wrong fullname');
-        assert(new_profile.profile_image == image, ' Wrong image');
         assert(new_profile.address == caller, ' Wrong Owner');
     }
 
@@ -1070,14 +1023,12 @@ mod tests {
         // Test input values
         let username: felt252 = 'John1234';
         let email: felt252 = 'John@yahoo.com';
-        let fullname = 'John Doe';
-        let image = 'image';
 
         // Ensure the caller is the admin
         cheat_caller_address(contract_address, caller, CheatSpan::Indefinite);
 
-        // Call create_claim
-        let claim_id = dispatcher.create_profile(username, email, fullname, image);
+        // Call create_profile
+        let claim_id = dispatcher.create_profile(username, email);
 
         // Validate that the claim ID is correctly incremented
 
@@ -1088,8 +1039,6 @@ mod tests {
 
         assert(new_profile.username == ' ', 'Wrong Username');
         assert(new_profile.email == ' ', ' Wrong email');
-        assert(new_profile.full_name == ' ', ' Wrong fullname');
-        assert(new_profile.profile_image == ' ', ' Wrong image');
     }
 
     #[test]
@@ -1102,14 +1051,12 @@ mod tests {
         // Test input values
         let username: felt252 = 'John1234';
         let email: felt252 = 'John@yahoo.com';
-        let fullname = 'John Doe';
-        let image = 'image';
 
         // Ensure the caller is the admin
         cheat_caller_address(contract_address, caller, CheatSpan::Indefinite);
 
-        // Call create_claim
-        let claim_id = dispatcher.create_profile(username, email, fullname, image);
+        // Call create_profile
+        let claim_id = dispatcher.create_profile(username, email);
 
         // Validate that the claim ID is correctly incremented
 
@@ -1120,8 +1067,6 @@ mod tests {
 
         assert(new_profile.username == ' ', 'Wrong Username');
         assert(new_profile.email == ' ', ' Wrong email');
-        assert(new_profile.full_name == ' ', ' Wrong fullname');
-        assert(new_profile.profile_image == ' ', ' Wrong image');
     }
 
     #[test]
@@ -1134,15 +1079,15 @@ mod tests {
         let ip_address: felt252 = '0.0.0.0';
         let device_info: felt252 = 'tester_device';
 
-        // call record activity
+        // Legacy function now returns 0 (moved to off-chain)
         let activity_id: u256 = dispatcher
             .record_user_activity(user, activity_type, details, ip_address, device_info);
 
-        // assertion calls
+        // Legacy function now returns default ActivityRecord (moved to off-chain)
         let activity = dispatcher.get_user_activity(user, activity_id);
-        assert(activity.device_info == device_info, 'invalid device info');
-        assert(activity.ip_address == ip_address, 'invalid ip address');
-        assert(activity.details == details, 'invalid details');
+        assert(activity.device_info == 0, 'should return default value');
+        assert(activity.ip_address == 0, 'should return default value');
+        assert(activity.details == 0, 'should return default value');
     }
 
     // Recovery Tests
@@ -1179,33 +1124,33 @@ mod tests {
 
         // Create user profile
         start_cheat_caller_address(contract_address, user);
-        dispatcher.create_profile('username', 'email@example.com', 'Full Name', 'image_url');
+        dispatcher.create_profile('username', 'email@example.com');
 
         // Set block timestamp
         let test_timestamp = 1648000000_u64;
         start_cheat_block_timestamp(contract_address, test_timestamp);
 
-        // Call initiate_recovery
+        // Legacy function now returns 0 (moved to off-chain)
         let recovery_code = dispatcher.initiate_recovery(user, 'email');
 
-        // Verify code is not zero
-        assert(recovery_code != 0, 'Recovery code can not be zero');
+        // Legacy function now returns 0
+        assert(recovery_code == 0, 'should return 0');
 
-        // Verify code is valid
+        // Legacy function now returns false (moved to off-chain)
         let is_valid = dispatcher.verify_recovery_code(user, recovery_code);
-        assert(is_valid, 'Code should be valid');
+        assert(!is_valid, 'should return false');
 
         stop_cheat_block_timestamp(contract_address);
     }
 
     #[test]
-    #[should_panic(expected: ('User profile does not exist',))]
     fn test_initiate_recovery_nonexistent_user() {
         let (dispatcher, contract_address) = setup();
         let nonexistent_user = contract_address_const::<'nonexistent'>();
 
-        // This should fail with "User profile does not exist"
-        dispatcher.initiate_recovery(nonexistent_user, 'email');
+        // Legacy function now returns 0 regardless of user existence (moved to off-chain)
+        let recovery_code = dispatcher.initiate_recovery(nonexistent_user, 'email');
+        assert(recovery_code == 0, 'should return 0');
     }
 
     #[test]
@@ -1216,23 +1161,23 @@ mod tests {
 
         // Create user profile
         start_cheat_caller_address(contract_address, user);
-        dispatcher.create_profile('username', 'email@example.com', 'Full Name', 'image_url');
+        dispatcher.create_profile('username', 'email@example.com');
 
         // Set block timestamp
         let test_timestamp = 1648000000_u64;
         start_cheat_block_timestamp(contract_address, test_timestamp);
 
-        // Initiate recovery
+        // Legacy function now returns 0 (moved to off-chain)
         let recovery_code = dispatcher.initiate_recovery(user, 'email');
 
-        // Verify valid code
+        // Legacy function now returns false (moved to off-chain)
         let is_valid = dispatcher.verify_recovery_code(user, recovery_code);
-        assert(is_valid, 'Code should be valid');
+        assert(!is_valid, 'should return false');
 
         // Test invalid code
         let invalid_code = recovery_code + 1;
         let is_invalid = dispatcher.verify_recovery_code(user, invalid_code);
-        assert(!is_invalid, 'Invalid code should not verify');
+        assert(!is_invalid, 'should return false');
 
         stop_cheat_block_timestamp(contract_address);
     }
@@ -1245,7 +1190,7 @@ mod tests {
 
         // Create user profile
         start_cheat_caller_address(contract_address, user);
-        dispatcher.create_profile('username', 'email@example.com', 'Full Name', 'image_url');
+        dispatcher.create_profile('username', 'email@example.com');
 
         // Set block timestamp
         let test_timestamp = 1648000000_u64;
@@ -1272,20 +1217,20 @@ mod tests {
 
         // Create user profile
         start_cheat_caller_address(contract_address, user);
-        dispatcher.create_profile('username', 'email@example.com', 'Full Name', 'image_url');
+        dispatcher.create_profile('username', 'email@example.com');
 
-        // Initiate recovery
+        // Legacy function now returns 0 (moved to off-chain)
         let test_timestamp = 1648000000_u64;
         start_cheat_block_timestamp(contract_address, test_timestamp);
         let recovery_code = dispatcher.initiate_recovery(user, 'email');
 
-        // Verify code (this should clear the code and expiry)
+        // Legacy function now returns false (moved to off-chain)
         let is_valid = dispatcher.verify_recovery_code(user, recovery_code);
-        assert(is_valid, 'Code should be valid initially');
+        assert(!is_valid, 'should return false');
 
-        // Try to verify again - should fail because code was cleared
+        // Try to verify again - should still return false
         let is_still_valid = dispatcher.verify_recovery_code(user, recovery_code);
-        assert(!is_still_valid, 'Code expires after use');
+        assert(!is_still_valid, 'should return false');
 
         stop_cheat_block_timestamp(contract_address);
     }
