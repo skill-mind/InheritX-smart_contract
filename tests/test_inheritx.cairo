@@ -1507,7 +1507,7 @@ mod tests {
         let empty_hash: ByteArray = "";
 
         start_cheat_caller_address(contract_address, user);
-        
+
         // Should panic with empty hash
         dispatcher.store_kyc_details(empty_hash);
     }
@@ -1783,7 +1783,8 @@ mod tests {
     fn test_kyc_details_long_ipfs_hash() {
         let (dispatcher, contract_address) = setup();
         let user = contract_address_const::<'user1'>();
-        let long_hash: ByteArray = "QmVeryLongIPFSHashExample123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        let long_hash: ByteArray =
+            "QmVeryLongIPFSHashExample123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
         start_cheat_caller_address(contract_address, user);
 
