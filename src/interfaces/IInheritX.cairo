@@ -179,4 +179,14 @@ pub trait IInheritX<TContractState> {
     fn plan_has_assets(self: @TContractState, plan_id: u256) -> bool;
 
     fn check_beneficiary_plan(self: @TContractState, plan_id: u256) -> bool;
+
+    fn store_kyc_details(ref self: TContractState, ipfs_hash: ByteArray) -> bool;
+
+    fn update_kyc_details(ref self: TContractState, new_ipfs_hash: ByteArray) -> ByteArray;
+
+    fn get_kyc_details(self: @TContractState, user: ContractAddress) -> ByteArray;
+
+    fn has_kyc_details(self: @TContractState, user: ContractAddress) -> bool;
+
+    fn delete_kyc_details(ref self: TContractState) -> bool;
 }

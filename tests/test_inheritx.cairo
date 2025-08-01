@@ -1474,6 +1474,360 @@ mod tests {
         assert(dispatcher.is_beneficiary(plan_id, beneficiary1), 'Beneficiary 1 should exist');
         assert(dispatcher.is_beneficiary(plan_id, beneficiary2), 'Beneficiary 2 should exist');
     }
+
+    // KYC Tests
+    #[test]
+    fn test_store_kyc_details_success() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user1'>();
+        let ipfs_hash: ByteArray = "QmTestHash123abcdef";
+
+        start_cheat_caller_address(contract_address, user);
+
+        // Store KYC details
+        let success = dispatcher.store_kyc_details(ipfs_hash.clone());
+        assert!(success, "KYC details storage should succeed");
+
+        // Verify KYC details were stored
+        let stored_hash = dispatcher.get_kyc_details(user);
+        assert!(stored_hash == ipfs_hash, "Stored hash should match input");
+
+        // Verify user has KYC details
+        let has_kyc = dispatcher.has_kyc_details(user);
+        assert!(has_kyc, "User should have KYC details");
+
+        stop_cheat_caller_address(contract_address);
+    }
+
+    #[test]
+    #[should_panic(expected: 'IPFS hash cannot be empty')]
+    fn test_store_kyc_details_empty_hash() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user1'>();
+        let empty_hash: ByteArray = "";
+
+        start_cheat_caller_address(contract_address, user);
+
+        // Should panic with empty hash
+        dispatcher.store_kyc_details(empty_hash);
+    }
+
+    #[test]
+    #[should_panic(expected: 'KYC details already exist')]
+    fn test_store_kyc_details_already_exists() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user1'>();
+        let ipfs_hash1: ByteArray = "QmTestHash123abcdef";
+        let ipfs_hash2: ByteArray = "QmDifferentHash456ghi";
+
+        start_cheat_caller_address(contract_address, user);
+
+        // Store first KYC details
+        dispatcher.store_kyc_details(ipfs_hash1);
+
+        // Try to store again - should panic
+        dispatcher.store_kyc_details(ipfs_hash2);
+    }
+
+    #[test]
+    fn test_update_kyc_details_success() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user1'>();
+        let original_hash: ByteArray = "QmOriginalHash123";
+        let new_hash: ByteArray = "QmNewHash456";
+
+        start_cheat_caller_address(contract_address, user);
+
+        // Store initial KYC details
+        dispatcher.store_kyc_details(original_hash.clone());
+
+        // Update KYC details
+        let updated_hash = dispatcher.update_kyc_details(new_hash.clone());
+        assert!(updated_hash == new_hash, "Updated hash should match new hash");
+
+        // Verify the details were updated
+        let stored_hash = dispatcher.get_kyc_details(user);
+        assert!(stored_hash == new_hash, "Stored hash should be updated");
+
+        stop_cheat_caller_address(contract_address);
+    }
+
+    #[test]
+    #[should_panic(expected: 'No existing KYC details')]
+    fn test_update_kyc_details_no_existing() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user1'>();
+        let new_hash: ByteArray = "QmNewHash456";
+
+        start_cheat_caller_address(contract_address, user);
+
+        // Try to update without existing KYC details - should panic
+        dispatcher.update_kyc_details(new_hash);
+    }
+
+    #[test]
+    #[should_panic(expected: 'IPFS hash cannot be empty')]
+    fn test_update_kyc_details_empty_hash() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user1'>();
+        let original_hash: ByteArray = "QmOriginalHash123";
+        let empty_hash: ByteArray = "";
+
+        start_cheat_caller_address(contract_address, user);
+
+        // Store initial KYC details
+        dispatcher.store_kyc_details(original_hash);
+
+        // Try to update with empty hash - should panic
+        dispatcher.update_kyc_details(empty_hash);
+    }
+
+    #[test]
+    #[should_panic(expected: 'New hash must be different')]
+    fn test_update_kyc_details_same_hash() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user1'>();
+        let hash: ByteArray = "QmSameHash123";
+
+        start_cheat_caller_address(contract_address, user);
+
+        // Store initial KYC details
+        dispatcher.store_kyc_details(hash.clone());
+
+        // Try to update with same hash - should panic
+        dispatcher.update_kyc_details(hash);
+    }
+
+    #[test]
+    fn test_get_kyc_details_own_access() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user1'>();
+        let ipfs_hash: ByteArray = "QmTestHash123abcdef";
+
+        start_cheat_caller_address(contract_address, user);
+
+        // Store KYC details
+        dispatcher.store_kyc_details(ipfs_hash.clone());
+
+        // User should be able to access their own KYC details
+        let retrieved_hash = dispatcher.get_kyc_details(user);
+        assert!(retrieved_hash == ipfs_hash, "User should access own KYC details");
+
+        stop_cheat_caller_address(contract_address);
+    }
+
+    #[test]
+    #[should_panic(expected: 'Unauthorized KYC access')]
+    fn test_get_kyc_details_unauthorized_access() {
+        let (dispatcher, contract_address) = setup();
+        let user1 = contract_address_const::<'user1'>();
+        let user2 = contract_address_const::<'user2'>();
+        let ipfs_hash: ByteArray = "QmTestHash123abcdef";
+
+        // User1 stores KYC details
+        start_cheat_caller_address(contract_address, user1);
+        dispatcher.store_kyc_details(ipfs_hash);
+        stop_cheat_caller_address(contract_address);
+
+        // User2 tries to access User1's KYC details - should panic
+        start_cheat_caller_address(contract_address, user2);
+        dispatcher.get_kyc_details(user1);
+    }
+
+    #[test]
+    fn test_has_kyc_details_true() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user1'>();
+        let ipfs_hash: ByteArray = "QmTestHash123abcdef";
+
+        start_cheat_caller_address(contract_address, user);
+
+        // Initially should not have KYC details
+        let has_kyc_before = dispatcher.has_kyc_details(user);
+        assert!(!has_kyc_before, "User should not have KYC details initially");
+
+        // Store KYC details
+        dispatcher.store_kyc_details(ipfs_hash);
+
+        // Now should have KYC details
+        let has_kyc_after = dispatcher.has_kyc_details(user);
+        assert!(has_kyc_after, "User should have KYC details after storing");
+
+        stop_cheat_caller_address(contract_address);
+    }
+
+    #[test]
+    fn test_has_kyc_details_false() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user1'>();
+
+        // User without KYC details
+        let has_kyc = dispatcher.has_kyc_details(user);
+        assert!(!has_kyc, "User without stored details should return false");
+    }
+
+    #[test]
+    fn test_delete_kyc_details_success() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user1'>();
+        let ipfs_hash: ByteArray = "QmTestHash123abcdef";
+
+        start_cheat_caller_address(contract_address, user);
+
+        // Store KYC details first
+        dispatcher.store_kyc_details(ipfs_hash);
+
+        // Verify details exist
+        let has_kyc_before = dispatcher.has_kyc_details(user);
+        assert!(has_kyc_before, "User should have KYC details before deletion");
+
+        // Delete KYC details
+        let success = dispatcher.delete_kyc_details();
+        assert!(success, "KYC deletion should succeed");
+
+        // Verify details are deleted
+        let has_kyc_after = dispatcher.has_kyc_details(user);
+        assert!(!has_kyc_after, "User should not have KYC details after deletion");
+
+        // Verify retrieved hash is empty
+        let retrieved_hash = dispatcher.get_kyc_details(user);
+        let empty_hash: ByteArray = "";
+        assert!(retrieved_hash == empty_hash, "Retrieved hash should be empty after deletion");
+
+        stop_cheat_caller_address(contract_address);
+    }
+
+    #[test]
+    #[should_panic(expected: 'No KYC details to delete')]
+    fn test_delete_kyc_details_no_existing() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user1'>();
+
+        start_cheat_caller_address(contract_address, user);
+
+        // Try to delete when no KYC details exist - should panic
+        dispatcher.delete_kyc_details();
+    }
+
+    #[test]
+    fn test_kyc_workflow_complete_cycle() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user1'>();
+        let original_hash: ByteArray = "QmOriginalHash123";
+        let updated_hash: ByteArray = "QmUpdatedHash456";
+
+        start_cheat_caller_address(contract_address, user);
+
+        // 1. Store initial KYC details
+        let store_success = dispatcher.store_kyc_details(original_hash.clone());
+        assert!(store_success, "Initial storage should succeed");
+
+        // 2. Verify storage
+        let has_kyc = dispatcher.has_kyc_details(user);
+        assert!(has_kyc, "Should have KYC details after storage");
+
+        let stored_hash = dispatcher.get_kyc_details(user);
+        assert!(stored_hash == original_hash, "Should retrieve original hash");
+
+        // 3. Update KYC details
+        let new_hash = dispatcher.update_kyc_details(updated_hash.clone());
+        assert!(new_hash == updated_hash, "Update should return new hash");
+
+        let updated_stored_hash = dispatcher.get_kyc_details(user);
+        assert!(updated_stored_hash == updated_hash, "Should retrieve updated hash");
+
+        // 4. Delete KYC details
+        let delete_success = dispatcher.delete_kyc_details();
+        assert!(delete_success, "Deletion should succeed");
+
+        let has_kyc_after_delete = dispatcher.has_kyc_details(user);
+        assert!(!has_kyc_after_delete, "Should not have KYC details after deletion");
+
+        // 5. Store again after deletion (should work)
+        let store_again_success = dispatcher.store_kyc_details(original_hash.clone());
+        assert!(store_again_success, "Should be able to store again after deletion");
+
+        stop_cheat_caller_address(contract_address);
+    }
+
+    #[test]
+    fn test_kyc_details_different_users() {
+        let (dispatcher, contract_address) = setup();
+        let user1 = contract_address_const::<'user1'>();
+        let user2 = contract_address_const::<'user2'>();
+        let hash1: ByteArray = "QmUser1Hash123";
+        let hash2: ByteArray = "QmUser2Hash456";
+
+        // User1 stores KYC details
+        start_cheat_caller_address(contract_address, user1);
+        dispatcher.store_kyc_details(hash1.clone());
+        let retrieved_hash1 = dispatcher.get_kyc_details(user1);
+        assert!(retrieved_hash1 == hash1, "User1 should retrieve own hash");
+        stop_cheat_caller_address(contract_address);
+
+        // User2 stores different KYC details
+        start_cheat_caller_address(contract_address, user2);
+        dispatcher.store_kyc_details(hash2.clone());
+        let retrieved_hash2 = dispatcher.get_kyc_details(user2);
+        assert!(retrieved_hash2 == hash2, "User2 should retrieve own hash");
+        stop_cheat_caller_address(contract_address);
+
+        // Verify both users have their own details
+        let user1_has_kyc = dispatcher.has_kyc_details(user1);
+        let user2_has_kyc = dispatcher.has_kyc_details(user2);
+        assert!(user1_has_kyc, "User1 should have KYC details");
+        assert!(user2_has_kyc, "User2 should have KYC details");
+    }
+
+    #[test]
+    fn test_kyc_details_long_ipfs_hash() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user1'>();
+        let long_hash: ByteArray =
+            "QmVeryLongIPFSHashExample123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+        start_cheat_caller_address(contract_address, user);
+
+        // Store long IPFS hash
+        let success = dispatcher.store_kyc_details(long_hash.clone());
+        assert!(success, "Should handle long IPFS hash");
+
+        // Verify retrieval
+        let retrieved_hash = dispatcher.get_kyc_details(user);
+        assert!(retrieved_hash == long_hash, "Should retrieve complete long hash");
+
+        stop_cheat_caller_address(contract_address);
+    }
+
+    #[test]
+    fn test_kyc_activity_recording() {
+        let (dispatcher, contract_address) = setup();
+        let user = contract_address_const::<'user1'>();
+        let ipfs_hash: ByteArray = "QmTestHash123";
+        let new_hash: ByteArray = "QmNewHash456";
+
+        start_cheat_caller_address(contract_address, user);
+
+        // Check initial activity count
+        let initial_count = dispatcher.get_activity_history_length(user);
+
+        // Store KYC details (should record activity)
+        dispatcher.store_kyc_details(ipfs_hash);
+        let count_after_store = dispatcher.get_activity_history_length(user);
+        assert!(count_after_store == initial_count + 1, "Activity should be recorded for store");
+
+        // Update KYC details (should record activity)
+        dispatcher.update_kyc_details(new_hash);
+        let count_after_update = dispatcher.get_activity_history_length(user);
+        assert!(count_after_update == initial_count + 2, "Activity should be recorded for update");
+
+        // Delete KYC details (should record activity)
+        dispatcher.delete_kyc_details();
+        let count_after_delete = dispatcher.get_activity_history_length(user);
+        assert!(count_after_delete == initial_count + 3, "Activity should be recorded for delete");
+
+        stop_cheat_caller_address(contract_address);
+    }
 }
 
 // Counter Logic and Proxy Test Helpers
