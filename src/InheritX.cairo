@@ -22,7 +22,6 @@ pub mod InheritX {
         SimpleBeneficiary, TokenInfo, UserProfile, UserRole, VerificationStatus, Wallet,
     };
 
-
     #[storage]
     struct Storage {
         // Core contract addresses
@@ -67,11 +66,32 @@ pub mod InheritX {
         plan_tokens: Map<u256, Map<u32, TokenInfo>>,
         // Minimal user profiles (essential data only)
         user_profiles: Map<ContractAddress, UserProfile>,
-        // IPFS data storage for off-chain content (simplified)
+        // IPFS data storage for off-chain content
         user_ipfs_hashes: Map<ContractAddress, Map<u8, felt252>>, // u8 represents IPFSDataType
         plan_ipfs_hashes: Map<u256, Map<u8, felt252>>, // u8 represents IPFSDataType
-        // Legacy storage for backward compatibility (will be removed)
-        beneficiary_details: Map<u256, Map<ContractAddress, SimpleBeneficiary>>,
+        // Recovery codes
+        recovery_codes: Map<ContractAddress, felt252>,
+        recovery_code_expiry: Map<ContractAddress, u64>,
+        // Storage mappings for notification
+        user_notifications: Map<ContractAddress, NotificationStruct>,
+        // Updated wallet-related storage mappings
+        user_wallets_length: Map<ContractAddress, u256>,
+        user_wallets: Map<ContractAddress, Map<u256, Wallet>>,
+        user_primary_wallet: Map<ContractAddress, ContractAddress>,
+        total_user_wallets: Map<ContractAddress, u256>,
+        // KYC details storage for IPFS hashes (CID)
+        kyc_details_uri: Map<ContractAddress, ByteArray>,
+    }
+
+    // Response-only struct (not stored)
+    #[derive(Drop, Serde)]
+    pub struct MediaMessageResponse {
+        pub file_hash: felt252,
+        pub file_name: felt252,
+        pub file_type: felt252,
+        pub file_size: u64,
+        pub recipients: Array<ContractAddress>, // Only in memory
+        pub upload_date: u64,
     }
 
     // Events
@@ -100,12 +120,38 @@ pub mod InheritX {
         timestamp: u64,
     }
 
+    #[derive(Drop, starknet::Event)]
+    pub struct KYCDetailsStored {
+        pub user: ContractAddress,
+        pub ipfs_hash: ByteArray,
+        pub timestamp: u64,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct KYCDetailsUpdated {
+        pub user: ContractAddress,
+        pub old_ipfs_hash: ByteArray,
+        pub new_ipfs_hash: ByteArray,
+        pub timestamp: u64,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct KYCDetailsDeleted {
+        pub user: ContractAddress,
+        pub timestamp: u64,
+    }
+
     #[event]
     #[derive(Drop, starknet::Event)]
     pub enum Event {
+        ActivityRecordEvent: ActivityRecordEvent,
         BeneficiaryAdded: BeneficiaryAdded,
+        NotificationUpdated: NotificationUpdated,
         IPFSDataUpdated: IPFSDataUpdated,
         PlanIPFSDataUpdated: PlanIPFSDataUpdated,
+        KYCDetailsStored: KYCDetailsStored,
+        KYCDetailsUpdated: KYCDetailsUpdated,
+        KYCDetailsDeleted: KYCDetailsDeleted,
     }
 
     // Data structures for hash generation
@@ -370,7 +416,6 @@ pub mod InheritX {
             self.inheritance_plans.write(plan_id, new_plan);
         }
 
-        // Legacy function - activity recording moved to off-chain
         fn record_user_activity(
             ref self: ContractState,
             user: ContractAddress,
@@ -384,7 +429,6 @@ pub mod InheritX {
             0
         }
 
-        // Legacy function - activity retrieval moved to off-chain
         fn get_user_activity(
             ref self: ContractState, user: ContractAddress, activity_id: u256,
         ) -> ActivityRecord {
@@ -416,7 +460,6 @@ pub mod InheritX {
             self.deployed.read()
         }
 
-        // Legacy verification functions - moved to off-chain
         fn start_verification(ref self: ContractState, user: ContractAddress) -> felt252 {
             // Verification moved to off-chain
             0
@@ -429,7 +472,8 @@ pub mod InheritX {
 
         fn complete_verififcation(
             ref self: ContractState, user: ContractAddress, code: felt252,
-        ) { // Verification completion moved to off-chain
+        ) {
+            // Verification completion moved to off-chain
         }
 
         fn get_verification_status(
@@ -506,7 +550,6 @@ pub mod InheritX {
             self.plan_beneficiaries.entry(plan_id).entry(index).read()
         }
 
-        // Legacy function - activity history moved to off-chain
         fn get_activity_history(
             self: @ContractState, user: ContractAddress, start_index: u256, page_size: u256,
         ) -> Array<ActivityRecord> {
@@ -525,7 +568,6 @@ pub mod InheritX {
             self.inheritance_plans.write(plan_id, plan);
         }
 
-        // Legacy function - activity history length moved to off-chain
         fn get_activity_history_length(self: @ContractState, user: ContractAddress) -> u256 {
             // Activity history length moved to off-chain via IPFS
             0
@@ -579,7 +621,6 @@ pub mod InheritX {
             poseidon_hash_span(claim_data_array.span())
         }
 
-        // Legacy recovery functions - moved to off-chain
         fn initiate_recovery(
             ref self: ContractState, user: ContractAddress, recovery_method: felt252,
         ) -> felt252 {
@@ -594,7 +635,6 @@ pub mod InheritX {
             false
         }
 
-        // Legacy notification functions - moved to off-chain
         fn update_notification(
             ref self: ContractState,
             user: ContractAddress,
@@ -630,7 +670,6 @@ pub mod InheritX {
             }
         }
 
-        // Legacy plan section function - simplified
         fn get_plan_section(
             self: @ContractState, plan_id: u256, section: PlanSection,
         ) -> PlanOverview {
@@ -714,13 +753,11 @@ pub mod InheritX {
             self.user_profiles.read(user)
         }
 
-        // Legacy security settings function - moved to off-chain
         fn update_security_settings(ref self: ContractState, new_settings: felt252) -> bool {
             // Security settings moved to off-chain via IPFS
             true
         }
 
-        // Legacy wallet functions - moved to off-chain
         fn add_wallet(
             ref self: ContractState, wallet: ContractAddress, wallet_type: felt252,
         ) -> bool {
@@ -798,7 +835,6 @@ pub mod InheritX {
             true
         }
 
-        // Production-ready IPFS functions with Pinata service integration
         fn update_user_ipfs_data(
             ref self: ContractState,
             user: ContractAddress,
@@ -870,6 +906,106 @@ pub mod InheritX {
             };
             let hash = self.plan_ipfs_hashes.entry(plan_id).entry(data_type_u8).read();
             IPFSData { hash, timestamp: get_block_timestamp(), data_type }
+        }
+
+        fn store_kyc_details(ref self: ContractState, ipfs_hash: ByteArray) -> bool {
+            let caller = get_caller_address();
+
+            // Ensure the user doesn't already have KYC details stored
+            let existing_hash = self.kyc_details_uri.entry(caller).read();
+            assert(existing_hash.len() == 0, 'KYC details already exist');
+
+            assert(ipfs_hash.len() > 0, 'IPFS hash cannot be empty');
+
+            self.kyc_details_uri.entry(caller).write(ipfs_hash.clone());
+
+            self
+                .record_user_activity(
+                    caller, ActivityType::ProfileUpdate, 'KYC details stored', '', '',
+                );
+
+            self
+                .emit(
+                    Event::KYCDetailsStored(
+                        KYCDetailsStored {
+                            user: caller, ipfs_hash: ipfs_hash, timestamp: get_block_timestamp(),
+                        },
+                    ),
+                );
+
+            true
+        }
+
+        fn update_kyc_details(ref self: ContractState, new_ipfs_hash: ByteArray) -> ByteArray {
+            let caller = get_caller_address();
+
+            // Get existing KYC details
+            let old_hash = self.kyc_details_uri.entry(caller).read();
+            assert(old_hash.len() > 0, 'No existing KYC details');
+
+            assert(new_ipfs_hash.len() > 0, 'IPFS hash cannot be empty');
+
+            assert(old_hash != new_ipfs_hash, 'New hash must be different');
+
+            self.kyc_details_uri.entry(caller).write(new_ipfs_hash.clone());
+
+            self
+                .record_user_activity(
+                    caller, ActivityType::ProfileUpdate, 'KYC details updated', '', '',
+                );
+
+            self
+                .emit(
+                    Event::KYCDetailsUpdated(
+                        KYCDetailsUpdated {
+                            user: caller,
+                            old_ipfs_hash: old_hash,
+                            new_ipfs_hash: new_ipfs_hash.clone(),
+                            timestamp: get_block_timestamp(),
+                        },
+                    ),
+                );
+
+            new_ipfs_hash
+        }
+
+        fn get_kyc_details(self: @ContractState, user: ContractAddress) -> ByteArray {
+            let caller = get_caller_address();
+
+            // Users can only access their own KYC details unless they're admin
+            let admin = self.admin.read();
+            assert(caller == user || caller == admin, 'Unauthorized KYC access');
+
+            self.kyc_details_uri.entry(user).read()
+        }
+
+        fn has_kyc_details(self: @ContractState, user: ContractAddress) -> bool {
+            let kyc_hash = self.kyc_details_uri.entry(user).read();
+            kyc_hash.len() > 0
+        }
+
+        fn delete_kyc_details(ref self: ContractState) -> bool {
+            let caller = get_caller_address();
+
+            let existing_hash = self.kyc_details_uri.entry(caller).read();
+            assert(existing_hash.len() > 0, 'No KYC details to delete');
+
+            let empty_hash: ByteArray = "";
+            self.kyc_details_uri.entry(caller).write(empty_hash);
+
+            self
+                .record_user_activity(
+                    caller, ActivityType::SecurityChange, 'KYC details deleted', '', '',
+                );
+
+            self
+                .emit(
+                    Event::KYCDetailsDeleted(
+                        KYCDetailsDeleted { user: caller, timestamp: get_block_timestamp() },
+                    ),
+                );
+
+            true
         }
     }
 }

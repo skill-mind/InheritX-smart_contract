@@ -165,7 +165,7 @@ pub trait IInheritX<TContractState> {
 
     fn check_beneficiary_plan(self: @TContractState, plan_id: u256) -> bool;
 
-    // New IPFS/Pinata integration functions
+    // IPFS/Pinata integration functions
     fn update_user_ipfs_data(
         ref self: TContractState,
         user: ContractAddress,
@@ -184,4 +184,15 @@ pub trait IInheritX<TContractState> {
     fn get_plan_ipfs_data(
         self: @TContractState, plan_id: u256, data_type: IPFSDataType,
     ) -> IPFSData;
+
+    // KYC-related functions
+    fn store_kyc_details(ref self: TContractState, ipfs_hash: ByteArray) -> bool;
+
+    fn update_kyc_details(ref self: TContractState, new_ipfs_hash: ByteArray) -> ByteArray;
+
+    fn get_kyc_details(self: @TContractState, user: ContractAddress) -> ByteArray;
+
+    fn has_kyc_details(self: @TContractState, user: ContractAddress) -> bool;
+
+    fn delete_kyc_details(ref self: TContractState) -> bool;
 }
