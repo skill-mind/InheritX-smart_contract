@@ -11,6 +11,7 @@ pub mod CounterLogicV2;
 pub mod InheritXSwap;
 pub mod Proxy;
 
+pub mod pinata_integration;
 
 pub mod types;
 
